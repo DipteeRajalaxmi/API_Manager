@@ -1,9 +1,9 @@
 CREATE TABLE audit_logs (
     audit_id     BIGSERIAL    PRIMARY KEY,   -- BIGSERIAL — high volume expected
-    user_id      INT          REFERENCES users(user_id) ON DELETE SET NULL,
+    user_id     BIGINT          REFERENCES users(user_id) ON DELETE SET NULL,
     action       VARCHAR(100) NOT NULL,
     resource     VARCHAR(50)  NOT NULL,
-    resource_id  INT,
+    resource_id BIGINT,
     detail       JSONB,
     ip_address   INET,
     performed_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,

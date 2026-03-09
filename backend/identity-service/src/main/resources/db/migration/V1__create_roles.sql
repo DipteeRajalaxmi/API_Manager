@@ -1,5 +1,5 @@
 CREATE TABLE roles (
-    role_id SERIAL PRIMARY KEY,
+    role_id BIGSERIAL PRIMARY KEY,
     role_name VARCHAR(50) NOT NULL UNIQUE,
     description TEXT,
     permissions JSONB,

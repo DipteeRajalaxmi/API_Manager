@@ -1,6 +1,6 @@
 CREATE TABLE access_tokens (
-    token_id     SERIAL      PRIMARY KEY,
-    key_id       INT         NOT NULL REFERENCES api_keys(key_id) ON DELETE CASCADE,
+    token_id     BIGSERIAL      PRIMARY KEY,
+    key_id       BIGINT         NOT NULL REFERENCES api_keys(key_id) ON DELETE CASCADE,
     access_token TEXT        NOT NULL UNIQUE,
     grant_type   VARCHAR(30) NOT NULL DEFAULT 'client_credentials',
     expires_at   TIMESTAMP   NOT NULL,

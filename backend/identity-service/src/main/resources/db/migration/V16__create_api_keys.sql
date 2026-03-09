@@ -1,6 +1,6 @@
 CREATE TABLE api_keys (
-    key_id        SERIAL       PRIMARY KEY,
-    app_id        INT          NOT NULL REFERENCES applications(app_id) ON DELETE CASCADE,
+    key_id        BIGSERIAL       PRIMARY KEY,
+    app_id        BIGINT          NOT NULL REFERENCES applications(app_id) ON DELETE CASCADE,
     client_id     VARCHAR(200) NOT NULL UNIQUE,
     client_secret TEXT         NOT NULL,    -- stored as bcrypt hash
     key_type      VARCHAR(20)  NOT NULL DEFAULT 'PRODUCTION',

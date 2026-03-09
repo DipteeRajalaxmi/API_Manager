@@ -1,6 +1,6 @@
 CREATE TABLE refresh_tokens (
-    rt_id         SERIAL    PRIMARY KEY,
-    key_id        INT       NOT NULL REFERENCES api_keys(key_id) ON DELETE CASCADE,
+    rt_id         BIGSERIAL    PRIMARY KEY,
+    key_id        BIGINT       NOT NULL REFERENCES api_keys(key_id) ON DELETE CASCADE,
     refresh_token TEXT      NOT NULL UNIQUE,
     expires_at    TIMESTAMP NOT NULL,
     revoked       BOOLEAN   NOT NULL DEFAULT false,

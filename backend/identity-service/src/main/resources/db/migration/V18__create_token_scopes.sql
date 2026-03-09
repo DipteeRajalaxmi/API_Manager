@@ -1,6 +1,6 @@
 CREATE TABLE token_scopes (
-    token_id INT NOT NULL REFERENCES access_tokens(token_id) ON DELETE CASCADE,
-    scope_id INT NOT NULL REFERENCES oauth_scopes(scope_id)  ON DELETE CASCADE,
+    token_id BIGINT NOT NULL REFERENCES access_tokens(token_id) ON DELETE CASCADE,
+    scope_id BIGINT NOT NULL REFERENCES oauth_scopes(scope_id)  ON DELETE CASCADE,
     PRIMARY KEY (token_id, scope_id)
 );
 

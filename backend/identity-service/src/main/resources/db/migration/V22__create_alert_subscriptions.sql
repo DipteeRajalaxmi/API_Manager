@@ -1,7 +1,7 @@
 CREATE TABLE alert_subscriptions (
     alert_id        SERIAL        PRIMARY KEY,
-    user_id         INT           NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    api_id          INT           NOT NULL REFERENCES apis(api_id)   ON DELETE CASCADE,
+    user_id         BIGINT           NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    api_id          BIGINT           NOT NULL REFERENCES apis(api_id)   ON DELETE CASCADE,
     alert_type      VARCHAR(50)   NOT NULL,
     threshold_value NUMERIC(10,2) NOT NULL,
     notify_email    TEXT,
