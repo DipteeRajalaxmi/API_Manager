@@ -1,4 +1,4 @@
-package com.apimanager.identity.exception;
+package com.apimanager.common.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

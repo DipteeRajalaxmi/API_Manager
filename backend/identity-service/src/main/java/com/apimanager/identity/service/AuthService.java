@@ -9,7 +9,7 @@ import com.apimanager.identity.dto.AuthResponse;
 import com.apimanager.identity.repository.OrganizationRepository;
 import com.apimanager.identity.repository.RoleRepository;
 import com.apimanager.identity.repository.UserRepository;
-import com.apimanager.identity.security.JwtUtil;
+import com.apimanager.common.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;

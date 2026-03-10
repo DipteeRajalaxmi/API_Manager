@@ -1,4 +1,4 @@
-package com.apimanager.identity.security;
+package com.apimanager.common.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
