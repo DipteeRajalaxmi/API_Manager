@@ -7,6 +7,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 import java.util.List;
+import com.apimanager.identity.entity.Organization;
+
 
 @Entity
 @Table(name = "apis")
@@ -21,7 +23,6 @@ public class Api {
     @Column(name = "api_id")
     private Long apiId;
 
-    // FIXED: was "api_name", DB has "name"
     @Column(name = "name", nullable = false)
     private String apiName;
 
@@ -34,7 +35,6 @@ public class Api {
     @Column(name = "base_url", nullable = false)
     private String baseUrl;
 
-    // FIXED: was "status", DB has "lifecycle_state"
     @Column(name = "lifecycle_state", nullable = false)
     @Builder.Default
     private String status = "draft";
@@ -69,4 +69,9 @@ public class Api {
 
     @OneToMany(mappedBy = "api", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ApiEndpoint> endpoints;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "org_id")
+    private Organization organization;
+    
 }

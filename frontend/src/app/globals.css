@@ -1,1 +1,70 @@
+
 @import "tailwindcss";
+:root {
+  --bg: #F4F7FE;
+  --teal: #4FD1C5;
+  --teal-dark: #319795;
+  --blue: #4299E1;
+}
+
+body {
+  background-color: var(--bg);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: #2D3748;
+  -webkit-font-smoothing: antialiased;
+}
+
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in  { animation: fade-in 0.3s ease both; }
+.animate-scale-in { animation: scale-in 0.2s ease both; }
+.animate-slide-up { animation: slide-up 0.3s ease both; }
+
+/* stagger children */
+.stagger > *:nth-child(1) { animation: fade-in 0.3s ease 0ms    both; }
+.stagger > *:nth-child(2) { animation: fade-in 0.3s ease 80ms   both; }
+.stagger > *:nth-child(3) { animation: fade-in 0.3s ease 160ms  both; }
+.stagger > *:nth-child(4) { animation: fade-in 0.3s ease 240ms  both; }
+.stagger > *:nth-child(5) { animation: fade-in 0.3s ease 320ms  both; }
+.stagger > *:nth-child(6) { animation: fade-in 0.3s ease 400ms  both; }
+
+/* ── Card ───────────────────────────────────────────────────────────────────── */
+
+.card {
+  background: white;
+  border-radius: 20px;
+  border: 1px solid #EDF2F7;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 4px 20px rgba(0,0,0,0.03);
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.card-lift:hover {
+  box-shadow: 0 8px 30px rgba(0,0,0,0.10);
+  transform: translateY(-2px);
+}
+
+
+.grad-teal   { background: linear-gradient(135deg, #4FD1C5, #38B2AC); }
+.grad-blue   { background: linear-gradient(135deg, #4299E1, #3182CE); }
+.grad-purple { background: linear-gradient(135deg, #9F7AEA, #805AD5); }
+.grad-navy   { background: linear-gradient(135deg, #4A5568, #2D3748); }
+
+
+::-webkit-scrollbar       { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CBD5E0; border-radius: 8px; }
+
+
+.line-clamp-1 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+.line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }

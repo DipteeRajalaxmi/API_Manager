@@ -1,0 +1,1 @@
+ALTER TABLE apis ADD COLUMN org_id BIGINT REFERENCES organizations(org_id) ON DELETE SET NULL;

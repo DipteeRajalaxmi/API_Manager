@@ -12,9 +12,8 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/apis")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "http://localhost:3000")
-
 public class ApiController {
+
     private final ApiService apiService;
 
     @PostMapping
@@ -23,8 +22,11 @@ public class ApiController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ApiResponse>> getAllPublishedApis() {
-        return ResponseEntity.ok(apiService.getAllPublishedApis());
+    public ResponseEntity<List<ApiResponse>> searchApis(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long orgId) {
+        return ResponseEntity.ok(apiService.searchPublishedApis(search, categoryId, orgId));
     }
 
     @GetMapping("/my")
@@ -32,9 +34,27 @@ public class ApiController {
         return ResponseEntity.ok(apiService.getMyApis());
     }
 
+    @GetMapping("/categories")
+    public ResponseEntity<?> getCategories() {
+        return ResponseEntity.ok(apiService.getCategories());
+    }
+
     @GetMapping("/{apiId}")
     public ResponseEntity<ApiResponse> getApiById(@PathVariable Long apiId) {
         return ResponseEntity.ok(apiService.getApiById(apiId));
+    }
+
+    @PutMapping("/{apiId}")
+    public ResponseEntity<ApiResponse> updateApi(
+            @PathVariable Long apiId,
+            @RequestBody ApiRequest request) {
+        return ResponseEntity.ok(apiService.updateApi(apiId, request));
+    }
+
+    @DeleteMapping("/{apiId}")
+    public ResponseEntity<Void> deleteApi(@PathVariable Long apiId) {
+        apiService.deleteApi(apiId);
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{apiId}/publish")
@@ -45,6 +65,23 @@ public class ApiController {
     @PatchMapping("/{apiId}/deprecate")
     public ResponseEntity<ApiResponse> deprecateApi(@PathVariable Long apiId) {
         return ResponseEntity.ok(apiService.deprecateApi(apiId));
+    }
+
+    @PatchMapping("/{apiId}/retire")
+    public ResponseEntity<ApiResponse> retireApi(@PathVariable Long apiId) {
+        return ResponseEntity.ok(apiService.retireApi(apiId));
+    }
+
+    @PostMapping("/{apiId}/versions")
+    public ResponseEntity<ApiResponse> createNewVersion(
+            @PathVariable Long apiId,
+            @RequestParam String version) {
+        return ResponseEntity.ok(apiService.createNewVersion(apiId, version));
+    }
+
+    @GetMapping("/{apiId}/versions")
+    public ResponseEntity<List<ApiResponse>> getVersions(@PathVariable Long apiId) {
+        return ResponseEntity.ok(apiService.getApiVersions(apiId));
     }
 
     @PostMapping("/{apiId}/endpoints")
@@ -59,14 +96,35 @@ public class ApiController {
         return ResponseEntity.ok(apiService.getEndpoints(apiId));
     }
 
+    @PutMapping("/{apiId}/endpoints/{endpointId}")
+    public ResponseEntity<ApiEndpointResponse> updateEndpoint(
+            @PathVariable Long apiId,
+            @PathVariable Long endpointId,
+            @RequestBody ApiEndpointRequest request) {
+        return ResponseEntity.ok(apiService.updateEndpoint(endpointId, request));
+    }
+
     @DeleteMapping("/endpoints/{endpointId}")
     public ResponseEntity<Void> deleteEndpoint(@PathVariable Long endpointId) {
         apiService.deleteEndpoint(endpointId);
         return ResponseEntity.noContent().build();
     }
-    @PatchMapping("/{apiId}/retire")
-    public ResponseEntity<ApiResponse> retireApi(@PathVariable Long apiId) {
-        return ResponseEntity.ok(apiService.retireApi(apiId));
+
+    @PostMapping("/{apiId}/documents")
+    public ResponseEntity<ApiDocumentResponse> addDocument(
+            @PathVariable Long apiId,
+            @Valid @RequestBody ApiDocumentRequest request) {
+        return ResponseEntity.ok(apiService.addDocument(apiId, request));
     }
-    
+
+    @GetMapping("/{apiId}/documents")
+    public ResponseEntity<List<ApiDocumentResponse>> getDocuments(@PathVariable Long apiId) {
+        return ResponseEntity.ok(apiService.getDocuments(apiId));
+    }
+
+    @DeleteMapping("/documents/{docId}")
+    public ResponseEntity<Void> deleteDocument(@PathVariable Long docId) {
+        apiService.deleteDocument(docId);
+        return ResponseEntity.noContent().build();
+    }
 }
