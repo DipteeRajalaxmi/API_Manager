@@ -49,6 +49,10 @@ public String generateRefreshToken(String email){
         return parseClaims(token).get("role", String.class);
     }
 
+    public Long extractUserId(String token) {
+        return parseClaims(token).get("userId", Long.class);
+    }
+
     // Check if token is valid and not expired
     public boolean isTokenValid(String token) {
         try {

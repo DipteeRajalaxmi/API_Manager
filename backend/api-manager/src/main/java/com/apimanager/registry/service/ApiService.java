@@ -1,5 +1,4 @@
 package com.apimanager.registry.service;
-
 import com.apimanager.identity.entity.User;
 import com.apimanager.identity.repository.UserRepository;
 import com.apimanager.registry.dto.*;
@@ -313,6 +312,10 @@ public class ApiService {
                 .createdByName(api.getCreatedBy() != null ? api.getCreatedBy().getName() : null)
                 .createdAt(api.getCreatedAt())
                 .updatedAt(api.getUpdatedAt())
+                .rateLimitPerMinute(api.getRateLimitPerMinute())
+                .rateLimitPerHour(api.getRateLimitPerHour())
+                .rateLimitPerDay(api.getRateLimitPerDay())
+                .rateLimitTotal(api.getRateLimitTotal())
                 .endpoints(api.getEndpoints() != null ?
                         api.getEndpoints().stream().map(this::mapEndpointToResponse).collect(Collectors.toList())
                         : null)

@@ -34,6 +34,10 @@ public class Api {
 
     @Column(name = "base_url", nullable = false)
     private String baseUrl;
+ 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private ApiCategory category;
 
     @Column(name = "lifecycle_state", nullable = false)
     @Builder.Default
@@ -50,22 +54,10 @@ public class Api {
     @Column(name = "cors_enabled")
     @Builder.Default
     private Boolean corsEnabled = false;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id")
-    private ApiCategory category;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "provider_id", nullable = false)
     private User createdBy;
-
-    @CreationTimestamp
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "api", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ApiEndpoint> endpoints;
@@ -73,5 +65,31 @@ public class Api {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "org_id")
     private Organization organization;
+
+    @Column(name = "tags", columnDefinition = "text[]")
+    private String[] tags;
+
+    @Column(name = "rate_limit_per_minute")
+    private Integer rateLimitPerMinute;
+ 
+    @Column(name = "rate_limit_per_hour")
+    private Integer rateLimitPerHour;
+ 
+    @Column(name = "rate_limit_per_day")
+    private Integer rateLimitPerDay;
+ 
+    @Column(name = "rate_limit_total")
+    private Integer rateLimitTotal;
+ 
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+ 
+    // @PreUpdate
+    // public void onUpdate() { this.updatedAt = LocalDateTime.now(); }
     
 }

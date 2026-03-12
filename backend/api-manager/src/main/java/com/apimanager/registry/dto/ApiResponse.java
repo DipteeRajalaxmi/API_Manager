@@ -24,5 +24,10 @@ public class ApiResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<ApiEndpointResponse> endpoints;
+    private Integer rateLimitPerMinute;
+    private Integer rateLimitPerHour;
+    private Integer rateLimitPerDay;
+    private Integer rateLimitTotal;
+ 
     
 }

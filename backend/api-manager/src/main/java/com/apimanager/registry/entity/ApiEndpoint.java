@@ -4,7 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "api_endpoints")
+@Table(name = "api_endpoints",
+       uniqueConstraints = @UniqueConstraint(columnNames = {"api_id", "method", "path"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -42,6 +43,9 @@ public class ApiEndpoint {
     // ADDED: these exist in DB, good to have
     @Column(name = "backend_url", columnDefinition = "TEXT")
     private String backendUrl;
+
+    @Column(name = "mock_response", columnDefinition = "jsonb")
+    private String mockResponse;
 
     @Column(name = "auth_override", length = 30)
     private String authOverride;
