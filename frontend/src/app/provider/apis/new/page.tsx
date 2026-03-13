@@ -12,7 +12,9 @@ export default function CreateApiPage() {
   const router = useRouter();
   const [form, setForm] = useState<CreateApiRequest>({
     apiName: "", version: "v1.0", description: "", baseUrl: "", visibility: "public",
-  });
+    rateLimitPerMinute: undefined, rateLimitPerHour: undefined,
+    rateLimitPerDay: undefined, rateLimitTotal: undefined,
+});
   const [errors, setErrors] = useState<Partial<Record<keyof CreateApiRequest, string>>>({});
   const [loading, setLoading] = useState(false);
   const [toast, setToast]     = useState<ToastState | null>(null);
@@ -77,6 +79,27 @@ export default function CreateApiPage() {
               <option value="public">🌐 Public — visible in marketplace</option>
               <option value="private">🔒 Private — restricted access</option>
             </Select>
+
+              {/* Rate Limits */}
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-3">
+                  Rate Limits <span className="text-gray-400 font-normal">(optional — leave blank to disable)</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input label="Per Minute" placeholder="e.g. 60" type="number"
+                    value={form.rateLimitPerMinute ?? ""}
+                    onChange={e => setForm(p => ({ ...p, rateLimitPerMinute: e.target.value ? Number(e.target.value) : undefined }))} />
+                  <Input label="Per Hour" placeholder="e.g. 1000" type="number"
+                    value={form.rateLimitPerHour ?? ""}
+                    onChange={e => setForm(p => ({ ...p, rateLimitPerHour: e.target.value ? Number(e.target.value) : undefined }))} />
+                  <Input label="Per Day" placeholder="e.g. 10000" type="number"
+                    value={form.rateLimitPerDay ?? ""}
+                    onChange={e => setForm(p => ({ ...p, rateLimitPerDay: e.target.value ? Number(e.target.value) : undefined }))} />
+                  <Input label="Total (lifetime)" placeholder="e.g. 100000" type="number"
+                    value={form.rateLimitTotal ?? ""}
+                    onChange={e => setForm(p => ({ ...p, rateLimitTotal: e.target.value ? Number(e.target.value) : undefined }))} />
+                </div>
+              </div>
 
             <div className="bg-teal-50 border border-teal-100 rounded-xl p-4 text-xs text-teal-700 flex gap-2">
               <span>ℹ</span>

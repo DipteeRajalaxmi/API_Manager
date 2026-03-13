@@ -19,6 +19,11 @@ public class AuthRequest {
 
     private String name;
     private String roleName;
-    private Long orgId;
+    // API_PROVIDER only
+    private String organizationName;
+    private String organizationDomain;
+
+    // DEVELOPER only (optional)
+    private String inviteCode;
 
 }

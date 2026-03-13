@@ -10,14 +10,15 @@ import { Input, Select, Textarea, Button } from "@/components/ui/FormFields";
 import {
   getApiById, getEndpoints, getDocuments, getVersions,
   publishApi, deprecateApi, retireApi, createVersion,
-  addEndpoint, deleteEndpoint, addDocument, deleteDocument,
+  addEndpoint, deleteEndpoint, addDocument, deleteDocument,updateRateLimits,
 } from "@/lib/registry";
 import {
   Api, ApiEndpoint, ApiDocument, ToastState, HttpMethod,
   CreateEndpointRequest, CreateDocumentRequest,
 } from "@/types/api";
 
-type Tab = "endpoints" | "documents" | "versions";
+
+type Tab = "endpoints" | "documents" | "versions" | "ratelimits";
 
 export default function ApiDetailPage() {
   const { id }  = useParams<{ id: string }>();
@@ -31,6 +32,10 @@ export default function ApiDetailPage() {
   const [tab, setTab]             = useState<Tab>("endpoints");
   const [toast, setToast]         = useState<ToastState | null>(null);
   const [lcBusy, setLcBusy]       = useState(false);
+
+
+  const [rlForm, setRlForm] = useState({ perMinute: "", perHour: "", perDay: "", total: "" });
+  const [rlSaving, setRlSaving] = useState(false);
 
   // modals
   const [epModal,  setEpModal]  = useState(false);
@@ -140,13 +145,13 @@ export default function ApiDetailPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
-          {(["endpoints", "documents", "versions"] as Tab[]).map((t) => {
-            const count = t === "endpoints" ? endpoints.length : t === "documents" ? documents.length : versions.length;
+          {(["endpoints", "documents", "versions", "ratelimits"] as Tab[]).map((t) => {
+            const count = t === "endpoints" ? endpoints.length : t === "documents" ? documents.length : t === "versions" ? versions.length : 0;
             return (
               <button key={t} onClick={() => setTab(t)}
                 className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all capitalize
                   ${tab === t ? "bg-white text-teal-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
-                {t} <span className="text-xs opacity-50">({count})</span>
+                {t === "ratelimits" ? "Rate Limits" : t} {t !== "ratelimits" && <span className="text-xs opacity-50">({count})</span>}
               </button>
             );
           })}
@@ -308,6 +313,59 @@ export default function ApiDetailPage() {
           </div>
         </Modal>
       )}
+
+      {/* Rate Limits */}
+        {tab === "ratelimits" && (
+          <div className="animate-fade-in max-w-md">
+            <h2 className="font-bold text-gray-800 mb-4">Rate Limits</h2>
+            <div className="card p-6">
+              <p className="text-xs text-gray-400 mb-5">Leave blank to disable a limit.</p>
+              <div className="flex flex-col gap-4">
+                <Input label="Per Minute" placeholder="e.g. 60" type="number"
+                  value={rlForm.perMinute}
+                  onChange={e => setRlForm(p => ({ ...p, perMinute: e.target.value }))} />
+                <Input label="Per Hour" placeholder="e.g. 1000" type="number"
+                  value={rlForm.perHour}
+                  onChange={e => setRlForm(p => ({ ...p, perHour: e.target.value }))} />
+                <Input label="Per Day" placeholder="e.g. 10000" type="number"
+                  value={rlForm.perDay}
+                  onChange={e => setRlForm(p => ({ ...p, perDay: e.target.value }))} />
+                <Input label="Total (lifetime)" placeholder="e.g. 100000" type="number"
+                  value={rlForm.total}
+                  onChange={e => setRlForm(p => ({ ...p, total: e.target.value }))} />
+                <Button variant="primary" disabled={rlSaving}
+                  onClick={async () => {
+                    setRlSaving(true);
+                    try {
+                      await updateRateLimits(apiId, {
+                        rateLimitPerMinute: rlForm.perMinute ? Number(rlForm.perMinute) : null,
+                        rateLimitPerHour:   rlForm.perHour   ? Number(rlForm.perHour)   : null,
+                        rateLimitPerDay:    rlForm.perDay     ? Number(rlForm.perDay)    : null,
+                        rateLimitTotal:     rlForm.total      ? Number(rlForm.total)     : null,
+                      });
+                      show("Rate limits saved");
+                    } catch (e: any) {
+                      show(e.response?.data?.error || "Failed", "error");
+                    } finally { setRlSaving(false); }
+                  }}>
+                  {rlSaving ? "Saving…" : "Save Rate Limits"}
+                </Button>
+              </div>
+            </div>
+
+            {(api.rateLimitPerMinute || api.rateLimitPerHour || api.rateLimitPerDay || api.rateLimitTotal) && (
+              <div className="mt-4 bg-teal-50 border border-teal-100 rounded-xl p-4">
+                <p className="text-xs font-semibold text-teal-600 mb-3">Current Limits</p>
+                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                  {api.rateLimitPerMinute && <span>Per minute: <strong>{api.rateLimitPerMinute}</strong></span>}
+                  {api.rateLimitPerHour   && <span>Per hour: <strong>{api.rateLimitPerHour}</strong></span>}
+                  {api.rateLimitPerDay    && <span>Per day: <strong>{api.rateLimitPerDay}</strong></span>}
+                  {api.rateLimitTotal     && <span>Total: <strong>{api.rateLimitTotal}</strong></span>}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </DashboardLayout>

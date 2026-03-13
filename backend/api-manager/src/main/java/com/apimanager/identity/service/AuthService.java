@@ -27,24 +27,44 @@ public class AuthService {
 
     public AuthResponse register(AuthRequest request) {
 
-        // Check if email already exists
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (userRepository.existsByEmail(request.getEmail()))
             throw new RuntimeException("Email already registered: " + request.getEmail());
-        }
 
-        // Find role — default to DEVELOPER if not provided
         String roleName = request.getRoleName() != null ? request.getRoleName() : "DEVELOPER";
         Role role = roleRepository.findByRoleName(roleName)
                 .orElseThrow(() -> new RuntimeException("Role not found: " + roleName));
 
-        // Find organization if orgId provided
         Organization org = null;
-        if (request.getOrgId() != null) {
-            org = organizationRepository.findById(request.getOrgId())
-                    .orElseThrow(() -> new RuntimeException("Organization not found: " + request.getOrgId()));
+
+        if ("API_PROVIDER".equals(roleName)) {
+            // provider must supply org name
+            if (request.getOrganizationName() == null || request.getOrganizationName().isBlank())
+                throw new RuntimeException("Organization name is required for API providers");
+
+            // generate unique invite code: first 3 letters of org + random 4 chars
+            String prefix = request.getOrganizationName()
+                    .replaceAll("[^a-zA-Z]", "")
+                    .toUpperCase()
+                    .substring(0, Math.min(3, request.getOrganizationName().replaceAll("[^a-zA-Z]", "").length()));
+            String inviteCode = prefix + "-" + randomCode();
+
+            org = Organization.builder()
+                    .orgName(request.getOrganizationName())
+                    .domain(request.getOrganizationDomain())
+                    .inviteCode(inviteCode)
+                    .status("active")
+                    .build();
+            org = organizationRepository.save(org);
+
+        } else if ("DEVELOPER".equals(roleName)) {
+            // developer with invite code → join that org
+            if (request.getInviteCode() != null && !request.getInviteCode().isBlank()) {
+                org = organizationRepository.findByInviteCode(request.getInviteCode())
+                        .orElseThrow(() -> new RuntimeException("Invalid invite code"));
+            }
+            // else org stays null → independent developer, sees public APIs only
         }
 
-        // Build and save user with hashed password
         User user = User.builder()
                 .email(request.getEmail())
                 .name(request.getName())
@@ -56,7 +76,6 @@ public class AuthService {
 
         user = userRepository.save(user);
 
-        // Generate tokens
         String token        = jwtUtil.generateToken(user.getEmail(), role.getRoleName(), user.getUserId());
         String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
 
@@ -68,6 +87,8 @@ public class AuthService {
                 .role(role.getRoleName())
                 .userId(user.getUserId())
                 .orgId(org != null ? org.getOrgId() : null)
+                .orgName(org != null ? org.getOrgName() : null)
+                .inviteCode(org != null ? org.getInviteCode() : null)
                 .build();
     }
 
@@ -100,5 +121,15 @@ public class AuthService {
                 .userId(user.getUserId())
                 .orgId(user.getOrganization() != null ? user.getOrganization().getOrgId() : null)
                 .build();
+    }
+
+
+    private String randomCode() {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder sb = new StringBuilder();
+        java.util.Random random = new java.util.Random();
+        for (int i = 0; i < 4; i++)
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        return sb.toString();
     }
 }

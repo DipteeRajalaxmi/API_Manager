@@ -29,8 +29,7 @@ public class Subscription {
     @JoinColumn(name = "app_id", nullable = false)
     private Application application;
  
-    // plan_id is NOT NULL in schema — we auto-assign Basic plan (id=1)
-    @Column(name = "plan_id", nullable = false)
+    @Column(name = "plan_id", nullable = true)
     private Long planId;
  
     // pending | active | blocked | cancelled | rejected

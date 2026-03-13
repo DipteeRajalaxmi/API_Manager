@@ -58,6 +58,8 @@ public class UserService {
                 .status(user.getStatus())
                 .orgId(user.getOrganization() != null ? user.getOrganization().getOrgId() : null)
                 .orgName(user.getOrganization() != null ? user.getOrganization().getOrgName() : null)
+                .orgDomain(user.getOrganization() != null ? user.getOrganization().getDomain() : null)
+                .inviteCode(user.getOrganization() != null ? user.getOrganization().getInviteCode() : null)
                 .createdAt(user.getCreatedAt())
                 .lastLoginAt(user.getLastLoginAt())
                 .build();

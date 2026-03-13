@@ -93,3 +93,13 @@ export const addDocument = async (
 export const deleteDocument = async (docId: number): Promise<void> => {
   await api.delete(`/api/documents/${docId}`);
 };
+
+
+export const updateRateLimits = async (apiId: number, data: {
+  rateLimitPerMinute: number | null;
+  rateLimitPerHour: number | null;
+  rateLimitPerDay: number | null;
+  rateLimitTotal: number | null;
+}): Promise<void> => {
+  await api.put(`/api/portal/provider/apis/${apiId}/rate-limits`, data);
+};

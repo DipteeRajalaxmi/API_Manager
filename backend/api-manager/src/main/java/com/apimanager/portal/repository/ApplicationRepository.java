@@ -12,4 +12,5 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
     List<Application> findByOrganization_OrgId(Long orgId);
 
     boolean existsByDeveloper_UserIdAndAppName(Long developerId, String appName);
+    List<Application> findByDeveloper_UserId(Long userId);
 }

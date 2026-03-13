@@ -28,10 +28,15 @@ public class Organization {
     @Column(name = "domain")
     private String domain;
 
+    @Column(name = "invite_code", unique = true)
+    private String inviteCode;
+
     @Column(name = "status")
+    @Builder.Default
     private String status = "active";
 
     @Column(name = "created_at", updatable = false)
+    @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
     
 }

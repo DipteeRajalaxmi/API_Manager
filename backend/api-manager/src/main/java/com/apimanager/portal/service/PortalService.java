@@ -37,9 +37,6 @@ public class PortalService {
 
     private final SecureRandom secureRandom = new SecureRandom();
 
-    // Default plan_id — seeded by V27 migration (Basic plan)
-    private static final Long DEFAULT_PLAN_ID = 1L;
-
     // ── Applications ──────────────────────────────────────────────────────────
 
     @Transactional
@@ -64,7 +61,7 @@ public class PortalService {
     public List<ApplicationResponse> getMyApplications(Long developerId) {
         User developer = getUser(developerId);
         return applicationRepo
-            .findByDeveloper_UserIdAndOrganization_OrgId(developerId, developer.getOrganization().getOrgId())
+            .findByDeveloper_UserId(developerId)
             .stream()
             .map(app -> {
                 int subCount = subscriptionRepo.findByApplication_AppId(app.getAppId()).size();
@@ -127,7 +124,6 @@ public class PortalService {
         Subscription sub = new Subscription();
         sub.setApi(api);
         sub.setApplication(app);
-        sub.setPlanId(DEFAULT_PLAN_ID);
         sub.setStatus("active");
         sub = subscriptionRepo.save(sub);
 

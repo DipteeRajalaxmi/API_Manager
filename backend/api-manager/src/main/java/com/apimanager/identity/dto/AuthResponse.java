@@ -19,5 +19,7 @@ public class AuthResponse {
     private String role;
     private Long userId;
     private Long orgId;
+    private String orgName;
+    private String inviteCode;  // returned only on provider registration
      
 }

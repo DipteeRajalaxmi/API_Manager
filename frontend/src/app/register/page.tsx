@@ -7,8 +7,9 @@ import { register, saveAuth, getHomeRoute } from "@/lib/auth";
 export default function RegisterPage() {
   const router = useRouter();
   const [form, setForm] = useState({
-    name: "", email: "", password: "", role: "DEVELOPER",
-  });
+  name: "", email: "", password: "", role: "DEVELOPER",
+  organizationName: "", organizationDomain: "", inviteCode: "",
+});
   const [error, setError]   = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +23,15 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      const data = await register(form.email, form.password, form.name, form.role);
+      const data = await register(
+        form.email,
+        form.password,
+        form.name,
+        form.role,
+        form.organizationName,
+        form.organizationDomain,
+        form.inviteCode
+      );
       saveAuth(data);
       router.push(getHomeRoute(data.role));
     } catch (err: any) {
@@ -150,6 +159,45 @@ export default function RegisterPage() {
                 ))}
               </div>
             </div>
+
+            {/* Org fields — shown only for API_PROVIDER */}
+            {form.role === "API_PROVIDER" && (
+              <div className="flex flex-col gap-4 p-4 bg-teal-50 rounded-xl border border-teal-100">
+                <p className="text-xs font-semibold text-teal-600 uppercase tracking-wider">Organization Details</p>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
+                    Organization Name <span className="text-red-400">*</span>
+                  </label>
+                  <input type="text" value={form.organizationName} onChange={set("organizationName")}
+                    placeholder="e.g. Averlon Inc."
+                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800
+                      placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition-all" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
+                    Domain <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <input type="text" value={form.organizationDomain} onChange={set("organizationDomain")}
+                    placeholder="e.g. averlon.com"
+                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800
+                      placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition-all" />
+                </div>
+              </div>
+            )}
+
+            {/* Invite code — shown only for DEVELOPER */}
+            {form.role === "DEVELOPER" && (
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
+                  Invite Code <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input type="text" value={form.inviteCode} onChange={set("inviteCode")}
+                  placeholder="e.g. AVE-X7K2 — leave blank if independent"
+                  className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800
+                    placeholder-gray-400 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition-all" />
+                <p className="text-xs text-gray-400 mt-1">Without a code you can only view public APIs</p>
+              </div>
+            )}
 
             <button onClick={handleRegister} disabled={loading}
               className="w-full grad-teal text-white font-semibold rounded-xl py-3 text-sm mt-1

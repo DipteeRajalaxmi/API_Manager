@@ -7,13 +7,19 @@ export const register = async (
   email: string,
   password: string,
   name: string,
-  roleName: string = "DEVELOPER"
+  roleName: string = "DEVELOPER",
+  organizationName?: string,
+  organizationDomain?: string,
+  inviteCode?: string
 ): Promise<AuthResponse> => {
   const response = await api.post<AuthResponse>("/api/auth/register", {
     email,
     password,
     name,
     roleName,
+    organizationName,
+    organizationDomain,
+    inviteCode,
   });
   return response.data;
 };
@@ -73,12 +79,15 @@ export const getNavItems = (role: string) => {
         { href: "/provider/dashboard", icon: "dashboard", label: "Dashboard"   },
         { href: "/provider/apis",      icon: "apis",      label: "My APIs"     },
         { href: "/marketplace",        icon: "market",    label: "Marketplace" },
+        { href: "/provider/settings", icon: "settings", label: "Settings" }
+
       ];
     case "DEVELOPER":
       return [
         { href: "/developer/dashboard", icon: "dashboard", label: "Dashboard"   },
         { href: "/marketplace",         icon: "market",    label: "Marketplace" },
         { href: "/developer/apps",      icon: "apps",      label: "My Apps"     },
+        { href: "/developer/settings", icon: "settings", label: "Settings" }
       ];
     case "ADMIN":
       return [

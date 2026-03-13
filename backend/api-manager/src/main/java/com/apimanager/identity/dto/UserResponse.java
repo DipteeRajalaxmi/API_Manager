@@ -19,6 +19,8 @@ public class UserResponse {
     private String status;
     private Long orgId;
     private String orgName;
+    private String orgDomain;
+    private String inviteCode;  // only populated for API_PROVIDER
     private LocalDateTime createdAt;
     private LocalDateTime lastLoginAt;
 }

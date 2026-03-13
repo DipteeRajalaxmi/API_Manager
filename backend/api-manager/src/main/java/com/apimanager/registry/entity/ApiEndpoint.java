@@ -2,6 +2,8 @@ package com.apimanager.registry.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "api_endpoints",
@@ -45,6 +47,7 @@ public class ApiEndpoint {
     private String backendUrl;
 
     @Column(name = "mock_response", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
     private String mockResponse;
 
     @Column(name = "auth_override", length = 30)

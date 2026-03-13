@@ -24,9 +24,8 @@ public class ApiController {
     @GetMapping
     public ResponseEntity<List<ApiResponse>> searchApis(
             @RequestParam(required = false) String search,
-            @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) Long orgId) {
-        return ResponseEntity.ok(apiService.searchPublishedApis(search, categoryId, orgId));
+            @RequestParam(required = false) Long categoryId) {
+        return ResponseEntity.ok(apiService.searchPublishedApis(search, categoryId, null));
     }
 
     @GetMapping("/my")

@@ -27,19 +27,17 @@ export default function DeveloperDashboard() {
             <p className="text-gray-400 text-xs">Discover and subscribe to APIs</p>
           </Link>
 
-          <div className="card p-6 opacity-60 cursor-not-allowed">
+          <Link href="/developer/apps" className="card p-6 card-lift block">
             <div className="w-12 h-12 grad-purple rounded-xl flex items-center justify-center text-white shadow-md mb-4 text-2xl">📱</div>
             <h3 className="font-bold text-gray-800 mb-1">My Applications</h3>
-            <p className="text-gray-400 text-xs">Manage your apps</p>
-            <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium mt-2 inline-block">Coming Soon</span>
-          </div>
+            <p className="text-gray-400 text-xs">Manage your apps and subscriptions</p>
+          </Link>
 
-          <div className="card p-6 opacity-60 cursor-not-allowed">
-            <div className="w-12 h-12 grad-navy rounded-xl flex items-center justify-center text-white shadow-md mb-4 text-2xl">🔑</div>
-            <h3 className="font-bold text-gray-800 mb-1">API Keys</h3>
-            <p className="text-gray-400 text-xs">Manage your credentials</p>
-            <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium mt-2 inline-block">Coming Soon</span>
-          </div>
+          <Link href="/developer/settings" className="card p-6 card-lift block">
+            <div className="w-12 h-12 grad-navy rounded-xl flex items-center justify-center text-white shadow-md mb-4 text-2xl">⚙️</div>
+            <h3 className="font-bold text-gray-800 mb-1">Settings</h3>
+            <p className="text-gray-400 text-xs">Profile, org info and security</p>
+          </Link>
         </div>
       </div>
     </DashboardLayout>

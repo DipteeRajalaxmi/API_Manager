@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import com.apimanager.registry.entity.ApiDocument;
 import com.apimanager.registry.repository.ApiDocumentRepository;
 import com.apimanager.identity.entity.Organization;
+import com.apimanager.portal.repository.ApiAllowedDeveloperRepository;
 
 
 import java.util.List;
@@ -28,6 +29,7 @@ public class ApiService {
     private final ApiCategoryRepository apiCategoryRepository;
     private final UserRepository userRepository;
     private final ApiDocumentRepository apiDocumentRepository;
+    private final ApiAllowedDeveloperRepository allowedDevRepository;
 
     
 
@@ -294,10 +296,47 @@ public class ApiService {
     }
 
     public List<ApiResponse> searchPublishedApis(String search, Long categoryId, Long orgId) {
-        return apiRepository.searchPublishedApis(search, categoryId, orgId)
-                .stream().map(this::mapToResponse).collect(Collectors.toList());
-}
+            String email = SecurityContextHolder.getContext().getAuthentication().getName();
+            User caller = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
 
+            Long callerOrgId = caller.getOrganization() != null
+                    ? caller.getOrganization().getOrgId()
+                    : null;
+
+            return apiRepository.findByStatus("published")
+                    .stream()
+                    .filter(api -> {
+                        switch (api.getVisibility()) {
+                            case "public":
+                                return true;
+
+                            case "private":
+                                if (callerOrgId == null) return false;
+                                return callerOrgId.equals(
+                                    api.getOrganization() != null ? api.getOrganization().getOrgId() : null
+                                );
+
+                            case "restricted":
+                                if (callerOrgId == null) return false;
+                                if (!callerOrgId.equals(
+                                    api.getOrganization() != null ? api.getOrganization().getOrgId() : null
+                                )) return false;
+                                return allowedDevRepository.existsByApi_ApiIdAndDeveloper_UserId(
+                                    api.getApiId(), caller.getUserId()
+                                );
+
+                            default: return false;
+                        }
+                    })
+                    .filter(api -> search == null || search.isBlank() ||
+                            api.getApiName().toLowerCase().contains(search.toLowerCase()))
+                    .filter(api -> categoryId == null ||
+                            (api.getCategory() != null &&
+                            api.getCategory().getCategoryId().equals(categoryId)))
+                    .map(this::mapToResponse)
+                    .collect(Collectors.toList());
+        }
     private ApiResponse mapToResponse(Api api) {
         return ApiResponse.builder()
                 .apiId(api.getApiId())

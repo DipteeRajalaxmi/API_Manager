@@ -6,6 +6,8 @@ export type AuthResponse = {
     role: string
     userId: number
     orgId: number | null
+    orgName: string | null;
+    inviteCode: string | null;  // returned only when API_PROVIDER registers
 }
 
 export type UserResponse = {
