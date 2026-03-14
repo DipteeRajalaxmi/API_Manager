@@ -40,6 +40,11 @@ public class UserController {
     public ResponseEntity<UserResponse> deactivateUser(@PathVariable Long id) {
         return ResponseEntity.ok(userService.deactivateUser(id));
     }
+
+    @GetMapping("/org")
+    public ResponseEntity<List<UserResponse>> getOrgDevelopers(Authentication authentication) {
+        return ResponseEntity.ok(userService.getOrgDevelopers(authentication.getName()));
+    }
     
     
 }

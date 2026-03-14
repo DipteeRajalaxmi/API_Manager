@@ -75,10 +75,11 @@ export default function CreateApiPage() {
             <Textarea label="Description" rows={4}
               placeholder="What does this API do?"
               value={form.description} onChange={set("description")} />
-            <Select label="Visibility" value={form.visibility} onChange={set("visibility")}>
-              <option value="public">🌐 Public — visible in marketplace</option>
-              <option value="private">🔒 Private — restricted access</option>
-            </Select>
+          <Select label="Visibility" value={form.visibility} onChange={set("visibility")}>
+            <option value="public">🌐 Public — visible in marketplace</option>
+            <option value="private">🔒 Private — org members only</option>
+            <option value="restricted">🎯 Restricted — specific developers only</option>
+          </Select>
 
               {/* Rate Limits */}
               <div>

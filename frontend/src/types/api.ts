@@ -89,11 +89,18 @@ export interface Subscription {
   apiName: string;
   apiVersion: string;
   status: string;
-  createdAt: string;
-  // usage counters
-  usageToday?: number;
-  usageThisHour?: number;
-  usageThisMinute?: number;
+  subscribedAt: string;
+  rateLimitPerMinute?: number | null;
+  rateLimitPerHour?: number | null;
+  rateLimitPerDay?: number | null;
+  rateLimitTotal?: number | null;
+  apiBaseUrl?: string; 
+  clientId?: string; 
+  // usage
+  usedPerMinute?: number;
+  usedPerHour?: number;
+  usedPerDay?: number;
+  usedTotal?: number;
 }
 
 export interface ApiKey {

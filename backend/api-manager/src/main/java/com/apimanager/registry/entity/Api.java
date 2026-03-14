@@ -70,16 +70,16 @@ public class Api {
     private String[] tags;
 
     @Column(name = "rate_limit_per_minute")
-    private Integer rateLimitPerMinute;
+    private Long rateLimitPerMinute;
  
     @Column(name = "rate_limit_per_hour")
-    private Integer rateLimitPerHour;
+    private Long rateLimitPerHour;
  
     @Column(name = "rate_limit_per_day")
-    private Integer rateLimitPerDay;
+    private Long rateLimitPerDay;
  
     @Column(name = "rate_limit_total")
-    private Integer rateLimitTotal;
+    private Long rateLimitTotal;
  
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

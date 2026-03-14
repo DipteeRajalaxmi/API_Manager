@@ -58,3 +58,27 @@ export const regenerateKey = async (subId: number): Promise<ApiKey & { rawClient
   const res = await api.post(`/api/portal/subscriptions/${subId}/key/regenerate`);
   return res.data;
 };
+
+
+export const getProviderSubscriptions = async (): Promise<Subscription[]> => {
+  const res = await api.get<Subscription[]>("/api/portal/provider/subscriptions");
+  return res.data;
+};
+
+export const updateSubscriptionStatus = async (subId: number, status: string): Promise<void> => {
+  await api.patch(`/api/portal/provider/subscriptions/${subId}/status`, { status });
+};
+
+
+export const getAllowedDevelopers = async (apiId: number): Promise<any[]> => {
+  const res = await api.get(`/api/portal/provider/apis/${apiId}/allowed-developers`);
+  return res.data;
+};
+
+export const addAllowedDeveloper = async (apiId: number, devId: number): Promise<void> => {
+  await api.post(`/api/portal/provider/apis/${apiId}/allowed-developers/${devId}`);
+};
+
+export const removeAllowedDeveloper = async (apiId: number, devId: number): Promise<void> => {
+  await api.delete(`/api/portal/provider/apis/${apiId}/allowed-developers/${devId}`);
+};

@@ -79,7 +79,8 @@ export const getNavItems = (role: string) => {
         { href: "/provider/dashboard", icon: "dashboard", label: "Dashboard"   },
         { href: "/provider/apis",      icon: "apis",      label: "My APIs"     },
         { href: "/marketplace",        icon: "market",    label: "Marketplace" },
-        { href: "/provider/settings", icon: "settings", label: "Settings" }
+        { href: "/provider/settings", icon: "settings", label: "Settings" },
+        { href: "/provider/developers", icon: "users", label: "Developers" }
 
       ];
     case "DEVELOPER":

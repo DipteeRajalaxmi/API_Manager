@@ -46,7 +46,7 @@ public class ApiUsageLog {
     @Column(name = "latency_ms", nullable = false)
     private Long  latencyMs;
  
-    @Column(name = "ip_address", columnDefinition = "inet")
+    @Column(name = "ip_address", columnDefinition = "text")
     private String ipAddress;
  
     @Column(name = "user_agent")

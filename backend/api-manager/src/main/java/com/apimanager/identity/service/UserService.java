@@ -64,4 +64,19 @@ public class UserService {
                 .lastLoginAt(user.getLastLoginAt())
                 .build();
     }
+
+
+    public List<UserResponse> getOrgDevelopers(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (user.getOrganization() == null)
+            throw new RuntimeException("You don't belong to any organization");
+
+        return userRepository.findByOrganization_OrgId(user.getOrganization().getOrgId())
+                .stream()
+                .filter(u -> u.getRole() != null && "DEVELOPER".equals(u.getRole().getRoleName()))
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
 }

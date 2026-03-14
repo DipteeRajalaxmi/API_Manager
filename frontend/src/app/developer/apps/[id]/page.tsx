@@ -6,19 +6,113 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { getAppSubscriptions, cancelSubscription, getSubscriptionKey, regenerateKey } from "@/lib/portal";
 import { Subscription, ApiKey } from "@/types/api";
 
-export default function AppDetailPage() {
-  const { id }   = useParams();
-  const router   = useRouter();
-  const appId    = Number(id);
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-  const [subs,      setSubs]      = useState<Subscription[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [keys,      setKeys]      = useState<Record<number, ApiKey>>({});
-  const [showKey,   setShowKey]   = useState<Record<number, boolean>>({});
-  const [copied,    setCopied]    = useState<number | null>(null);
-  const [regen,     setRegen]     = useState<number | null>(null);
-  const [regenResult, setRegenResult] = useState<{subId: number; secret: string} | null>(null);
-  const [cancelling, setCancelling]  = useState<number | null>(null);
+function usagePct(used?: number, limit?: number | null): number | null {
+  if (!limit || used === undefined) return null;
+  return Math.min(100, Math.round((used / limit) * 100));
+}
+
+function alertLevel(pct: number | null): "ok" | "warn" | "danger" | null {
+  if (pct === null) return null;
+  if (pct >= 100) return "danger";
+  if (pct >= 80)  return "warn";
+  return "ok";
+}
+
+// ── Usage Bar ─────────────────────────────────────────────────────────────────
+
+function UsageBar({ label, used, limit }: {
+  label: string; used?: number; limit?: number | null;
+}) {
+  const pct   = usagePct(used, limit);
+  const level = alertLevel(pct);
+
+  if (limit === null || limit === undefined) return null;
+
+  const barColor =
+    level === "danger" ? "bg-red-500" :
+    level === "warn"   ? "bg-amber-400" :
+                         "bg-teal-400";
+
+  const textColor =
+    level === "danger" ? "text-red-600" :
+    level === "warn"   ? "text-amber-600" :
+                         "text-gray-600";
+
+  return (
+    <div className="mb-3">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs font-semibold text-gray-500">{label}</span>
+        <span className={`text-xs font-bold ${textColor}`}>
+          {used ?? 0} / {limit}
+          {pct !== null && <span className="ml-1 opacity-60">({pct}%)</span>}
+        </span>
+      </div>
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${pct ?? 0}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Alert Banner ──────────────────────────────────────────────────────────────
+
+function UsageAlerts({ sub }: { sub: Subscription }) {
+  const alerts: { label: string; pct: number; level: "warn" | "danger" }[] = [];
+
+  const checks = [
+    { label: "Per minute",  used: sub.usedPerMinute, limit: sub.rateLimitPerMinute },
+    { label: "Per hour",    used: sub.usedPerHour,   limit: sub.rateLimitPerHour   },
+    { label: "Per day",     used: sub.usedPerDay,    limit: sub.rateLimitPerDay    },
+    { label: "Total",       used: sub.usedTotal,     limit: sub.rateLimitTotal     },
+  ];
+
+  for (const c of checks) {
+    const pct   = usagePct(c.used, c.limit);
+    const level = alertLevel(pct);
+    if (level === "warn" || level === "danger")
+      alerts.push({ label: c.label, pct: pct!, level });
+  }
+
+  if (alerts.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-2 mb-4">
+      {alerts.map((a, i) => (
+        <div key={i}
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold
+            ${a.level === "danger"
+              ? "bg-red-50 border border-red-200 text-red-600"
+              : "bg-amber-50 border border-amber-200 text-amber-700"}`}>
+          <span>{a.level === "danger" ? "🔴" : "🟡"}</span>
+          {a.level === "danger"
+            ? `${a.label} rate limit exceeded (${a.pct}%)`
+            : `${a.label} limit at ${a.pct}% — approaching limit`}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
+
+export default function AppDetailPage() {
+  const { id }  = useParams();
+  const router  = useRouter();
+  const appId   = Number(id);
+
+  const [subs,        setSubs]        = useState<Subscription[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [keys,        setKeys]        = useState<Record<number, ApiKey>>({});
+  const [showKey,     setShowKey]     = useState<Record<number, boolean>>({});
+  const [copied,      setCopied]      = useState<number | null>(null);
+  const [regen,       setRegen]       = useState<number | null>(null);
+  const [regenResult, setRegenResult] = useState<{ subId: number; secret: string } | null>(null);
+  const [cancelling,  setCancelling]  = useState<number | null>(null);
 
   useEffect(() => {
     getAppSubscriptions(appId)
@@ -28,10 +122,7 @@ export default function AppDetailPage() {
   }, [appId]);
 
   const loadKey = async (subId: number) => {
-    if (keys[subId]) {
-      setShowKey(p => ({ ...p, [subId]: !p[subId] }));
-      return;
-    }
+    if (keys[subId]) { setShowKey(p => ({ ...p, [subId]: !p[subId] })); return; }
     try {
       const key = await getSubscriptionKey(subId);
       setKeys(p => ({ ...p, [subId]: key }));
@@ -45,7 +136,7 @@ export default function AppDetailPage() {
     try {
       const result = await regenerateKey(subId);
       setKeys(p => ({ ...p, [subId]: result }));
-      setRegenResult({ subId, secret: result.rawClientSecret });
+      setRegenResult({ subId, secret: result.rawClientSecret ?? result.clientId });
     } catch (e) { console.error(e); }
     finally { setRegen(null); }
   };
@@ -61,11 +152,15 @@ export default function AppDetailPage() {
     } finally { setCancelling(null); }
   };
 
-  const copyToClipboard = (text: string, subId: number) => {
+  const copyText = (text: string, id: number) => {
     navigator.clipboard.writeText(text);
-    setCopied(subId);
+    setCopied(id);
     setTimeout(() => setCopied(null), 2000);
   };
+
+  const hasAnyLimit = (sub: Subscription) =>
+    sub.rateLimitPerMinute || sub.rateLimitPerHour ||
+    sub.rateLimitPerDay    || sub.rateLimitTotal;
 
   return (
     <DashboardLayout>
@@ -90,20 +185,19 @@ export default function AppDetailPage() {
             className="grad-teal text-white font-semibold text-sm px-5 py-2.5 rounded-xl
               shadow-md shadow-teal-200 hover:opacity-90 transition-all flex items-center gap-2">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M12 4v16m8-8H4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             Add Subscription
           </Link>
         </div>
 
-        {/* Regen result banner */}
+        {/* Regen banner */}
         {regenResult && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-5">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-bold text-amber-700 mb-1">🔑 New API Key Generated</p>
-                <p className="text-xs text-amber-600 mb-3">Save this secret — it won't be shown again</p>
+                <p className="text-xs text-amber-600 mb-3">Save this — it won't be shown again</p>
                 <code className="text-sm font-mono text-gray-800 break-all">{regenResult.secret}</code>
               </div>
               <button onClick={() => setRegenResult(null)} className="text-amber-400 hover:text-amber-600 ml-4">
@@ -112,7 +206,7 @@ export default function AppDetailPage() {
                 </svg>
               </button>
             </div>
-            <button onClick={() => copyToClipboard(regenResult.secret, -1)}
+            <button onClick={() => copyText(regenResult.secret, -1)}
               className={`mt-3 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all
                 ${copied === -1 ? "bg-green-500 text-white" : "bg-amber-200 text-amber-800 hover:bg-amber-300"}`}>
               {copied === -1 ? "✓ Copied!" : "Copy Secret"}
@@ -145,9 +239,10 @@ export default function AppDetailPage() {
             </Link>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-5">
             {subs.map(sub => (
               <div key={sub.subscriptionId} className="card p-6">
+
                 {/* Sub header */}
                 <div className="flex items-start justify-between mb-4">
                   <div>
@@ -158,28 +253,47 @@ export default function AppDetailPage() {
                       </span>
                     </div>
                     <p className="text-xs text-gray-400">
-                      Subscribed {sub.createdAt ? new Date(sub.createdAt).toLocaleDateString("en-IN", { 
-                                    day: "numeric", month: "short", year: "numeric" 
-                                    }) : "—"}
+                      Subscribed {sub.subscribedAt
+                        ? new Date(sub.subscribedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                        : "—"}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full
-                      ${sub.status === "active"    ? "bg-green-50 text-green-600"  :
-                        sub.status === "blocked"   ? "bg-red-50 text-red-500"     :
-                        sub.status === "cancelled" ? "bg-gray-100 text-gray-400"  :
-                                                     "bg-amber-50 text-amber-600"}`}>
-                      {sub.status}
-                    </span>
-                  </div>
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full
+                    ${sub.status === "active"    ? "bg-green-50 text-green-600"  :
+                      sub.status === "blocked"   ? "bg-red-50 text-red-500"     :
+                      sub.status === "cancelled" ? "bg-gray-100 text-gray-400"  :
+                                                   "bg-amber-50 text-amber-600"}`}>
+                    {sub.status === "blocked" ? "🚫 Blocked by provider" : sub.status}
+                  </span>
                 </div>
 
-                {/* Usage counters */}
-                {(sub.usageToday !== undefined || sub.usageThisHour !== undefined) && (
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    <UsageStat label="Today"       value={sub.usageToday ?? 0} />
-                    <UsageStat label="This Hour"   value={sub.usageThisHour ?? 0} />
-                    <UsageStat label="This Minute" value={sub.usageThisMinute ?? 0} />
+                {/* Blocked warning */}
+                {sub.status === "blocked" && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-xs text-red-600 font-semibold">
+                    🚫 This subscription has been blocked by the API provider. Contact them to reactivate.
+                  </div>
+                )}
+
+                {/* Usage alerts */}
+                <UsageAlerts sub={sub} />
+
+                {/* Usage bars — only if limits are set */}
+                {hasAnyLimit(sub) && (
+                  <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 mb-4">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                      Rate Limit Usage
+                    </p>
+                    <UsageBar label="Per Minute" used={sub.usedPerMinute} limit={sub.rateLimitPerMinute} />
+                    <UsageBar label="Per Hour"   used={sub.usedPerHour}   limit={sub.rateLimitPerHour}   />
+                    <UsageBar label="Per Day"    used={sub.usedPerDay}    limit={sub.rateLimitPerDay}    />
+                    <UsageBar label="Total"      used={sub.usedTotal}     limit={sub.rateLimitTotal}     />
+                  </div>
+                )}
+
+                {/* No limits set */}
+                {!hasAnyLimit(sub) && sub.status === "active" && (
+                  <div className="bg-green-50 border border-green-100 rounded-xl p-3 mb-4 text-xs text-green-600 font-semibold">
+                    ✅ No rate limits set — unlimited access
                   </div>
                 )}
 
@@ -193,18 +307,17 @@ export default function AppDetailPage() {
                         {showKey[sub.subscriptionId] ? "Hide" : "View Key Info"}
                       </button>
                     </div>
-
                     {showKey[sub.subscriptionId] && keys[sub.subscriptionId] && (
                       <div className="mt-2 space-y-2">
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-xs text-gray-400 mb-0.5">Client ID</p>
-                            <code className="text-xs font-mono text-gray-700">
+                            <code className="text-xs font-mono text-gray-700 break-all">
                               {keys[sub.subscriptionId].clientId}
                             </code>
                           </div>
-                          <button onClick={() => copyToClipboard(keys[sub.subscriptionId].clientId, sub.subscriptionId)}
-                            className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all
+                          <button onClick={() => copyText(keys[sub.subscriptionId].clientId, sub.subscriptionId)}
+                            className={`ml-3 flex-shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all
                               ${copied === sub.subscriptionId
                                 ? "bg-green-500 text-white"
                                 : "bg-white border border-gray-200 text-gray-500 hover:border-teal-300"}`}>
@@ -212,12 +325,9 @@ export default function AppDetailPage() {
                           </button>
                         </div>
                         <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                          <div>
-                            <p className="text-xs text-gray-400 mb-0.5">Type</p>
-                            <span className="text-xs font-semibold text-gray-600">
-                              {keys[sub.subscriptionId].keyType}
-                            </span>
-                          </div>
+                          <span className="text-xs font-semibold text-gray-600">
+                            {keys[sub.subscriptionId].keyType}
+                          </span>
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full
                             ${keys[sub.subscriptionId].status === "active"
                               ? "bg-green-50 text-green-600"
@@ -247,20 +357,12 @@ export default function AppDetailPage() {
                     </button>
                   )}
                 </div>
+
               </div>
             ))}
           </div>
         )}
       </div>
     </DashboardLayout>
-  );
-}
-
-function UsageStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 text-center">
-      <p className="text-lg font-extrabold text-gray-800">{value}</p>
-      <p className="text-xs text-gray-400">{label}</p>
-    </div>
   );
 }

@@ -19,5 +19,5 @@ export type UserResponse = {
     orgId: number | null
     orgName: string | null
     createdAt: string
-    lastLoginAt: string | null
+    lastLoginAt?: string | null;
 }

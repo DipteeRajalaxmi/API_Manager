@@ -20,10 +20,10 @@ public class SubscriptionResponse {
     private LocalDateTime subscribedAt;
 
     // Rate limits defined by provider on this API (null = that limit not set)
-    private Integer rateLimitPerMinute;
-    private Integer rateLimitPerHour;
-    private Integer rateLimitPerDay;
-    private Integer rateLimitTotal;
+    private Long rateLimitPerMinute;
+    private Long rateLimitPerHour;
+    private Long rateLimitPerDay;
+    private Long rateLimitTotal;
 
     // Current usage counters (populated on fetch)
     private Long usedPerMinute;
