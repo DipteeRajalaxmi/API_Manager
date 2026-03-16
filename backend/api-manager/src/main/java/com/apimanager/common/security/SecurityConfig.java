@@ -42,7 +42,8 @@ public class SecurityConfig {
                     "/gateway/**",
                     "/v3/api-docs/**",
                     "/api/portal/**",
-                    "/actuator/**"
+                    "/actuator/**",
+                    "/api/analytics/**"
                 ).permitAll()
                 .anyRequest().authenticated()
             )

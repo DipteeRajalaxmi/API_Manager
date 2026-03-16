@@ -26,6 +26,8 @@ public class GatewayService {
     private final ApiKeyRepository    apiKeyRepo;
     private final ApiUsageLogRepository usageLogRepo;
     private final RestTemplate        restTemplate;
+    private final java.util.concurrent.ConcurrentHashMap<Long, CircuitBreakerState> circuitBreakers
+    = new java.util.concurrent.ConcurrentHashMap<>();
 
       public GatewayResult handle(
             String rawKey,
@@ -61,18 +63,29 @@ public class GatewayService {
                     429L, System.currentTimeMillis() - startMs, true, rl.limitType);
             throw new RateLimitException(rl.limitType, rl.limit, rl.retryAfterSeconds);
         }
+
+        // ── 3.5 Circuit breaker check ─────────────────────────────────────────────
+        Long apiId = api.getApiId();
+        CircuitBreakerState circuit = circuitBreakers.computeIfAbsent(apiId, k -> new CircuitBreakerState());
+        if (circuit.isOpen()) {
+            logCall(apiKey, sub, apiPath, method.name(), request,
+                    503L, System.currentTimeMillis() - startMs, false, null);
+            throw new CircuitOpenException("Circuit open for API: " + api.getApiName());
+        }
  
         // ── 4. Forward request to provider backend ───────────────────────────
         String targetUrl = buildTargetUrl(api.getBaseUrl(), apiPath, request.getQueryString());
  
-        HttpHeaders forwardHeaders = buildForwardHeaders(request);
+        HttpHeaders forwardHeaders = buildForwardHeaders(request, sub);
         HttpEntity<String> entity  = new HttpEntity<>(body, forwardHeaders);
  
         ResponseEntity<String> upstream;
         try {
             upstream = restTemplate.exchange(targetUrl, method, entity, String.class);
+            circuit.recordSuccess();
         } catch (Exception e) {
             log.error("Gateway upstream error: {}", e.getMessage());
+            circuit.recordFailure(); 
             // log failed call
             logCall(apiKey, sub, apiPath, method.name(), request,
                     502L, System.currentTimeMillis() - startMs, false, null);
@@ -84,6 +97,7 @@ public class GatewayService {
         // ── 5. Log successful call ────────────────────────────────────────────
         logCall(apiKey, sub, apiPath, method.name(), request,
                 (long) upstream.getStatusCode().value(), latency, false, null);
+        
  
         // ── 6. Update key last_used_at ────────────────────────────────────────
         apiKey.setLastUsedAt(LocalDateTime.now());
@@ -162,7 +176,7 @@ public class GatewayService {
         return queryString != null ? base + p + "?" + queryString : base + p;
     }
  
-    private HttpHeaders buildForwardHeaders(HttpServletRequest request) {
+    private HttpHeaders buildForwardHeaders(HttpServletRequest request, Subscription sub) {
         HttpHeaders headers = new HttpHeaders();
         Enumeration<String> names = request.getHeaderNames();
         while (names != null && names.hasMoreElements()) {
@@ -178,6 +192,11 @@ public class GatewayService {
         String ip = getClientIp(request);
         headers.set("X-Forwarded-For", ip);
         headers.set("X-Gateway-By", "APIManager");
+        headers.set("X-Developer-Id",     sub.getApplication().getDeveloper().getUserId().toString());
+        headers.set("X-Developer-Name",   sub.getApplication().getDeveloper().getName());
+        headers.set("X-App-Name",         sub.getApplication().getAppName());
+        headers.set("X-Subscription-Id",  sub.getSubscriptionId().toString());
+        headers.set("X-Organization-Id",  sub.getApi().getOrganization().getOrgId().toString());
         return headers;
     }
  
@@ -186,21 +205,20 @@ public class GatewayService {
                          Long status, Long latency,
                          boolean rateLimited, String rateLimitType) {
         try {
-            ApiUsageLog log = new ApiUsageLog();
-            log.setApi(sub.getApi());
-            log.setApplication(sub.getApplication());
-            log.setSubscription(sub);
-            log.setDeveloper(sub.getApplication().getDeveloper());
-            log.setHttpMethod(method);
-            log.setEndpointPath("/" + path);
-            log.setResponseStatus(status);
-            log.setLatencyMs(latency);
-            // log.setIpAddress(getClientIp(request));
-            log.setUserAgent(request.getHeader("User-Agent"));
-            log.setWasRateLimited(rateLimited);
-            log.setRateLimitType(rateLimitType);
-            log.setRequestTime(LocalDateTime.now());
-            usageLogRepo.save(log);
+            ApiUsageLog usageLog = new ApiUsageLog();
+                usageLog.setApi(sub.getApi());
+                usageLog.setApplication(sub.getApplication());
+                usageLog.setSubscription(sub);
+                usageLog.setDeveloper(sub.getApplication().getDeveloper());
+                usageLog.setHttpMethod(method);
+                usageLog.setEndpointPath("/" + path);
+                usageLog.setResponseStatus(status);
+                usageLog.setLatencyMs(latency);
+                usageLog.setUserAgent(request.getHeader("User-Agent"));
+                usageLog.setWasRateLimited(rateLimited);
+                usageLog.setRateLimitType(rateLimitType);
+                usageLog.setRequestTime(LocalDateTime.now());
+                usageLogRepo.save(usageLog);
         } catch (Exception e) {
         e.printStackTrace();
         log.error("Failed to log gateway call: {}", e.getMessage(), e);
@@ -246,6 +264,40 @@ public class GatewayService {
             return r;
         }
     }
+
+
+    private static class CircuitBreakerState {
+        private static final int    FAILURE_THRESHOLD = 5;
+        private static final long   COOLDOWN_MS       = 30_000; // 30 seconds
+
+        private int  failures    = 0;
+        private long openedAt    = 0;
+        private boolean open     = false;
+
+        synchronized boolean isOpen() {
+            if (!open) return false;
+            // check if cooldown passed — half-open
+            if (System.currentTimeMillis() - openedAt > COOLDOWN_MS) {
+                open = false; // allow one request through
+                return false;
+            }
+            return true;
+        }
+
+        synchronized void recordFailure() {
+            failures++;
+            if (failures >= FAILURE_THRESHOLD) {
+                open     = true;
+                openedAt = System.currentTimeMillis();
+                failures = 0;
+            }
+        }
+
+        synchronized void recordSuccess() {
+            failures = 0;
+            open     = false;
+        }
+    }
  
     // ── Custom exceptions ─────────────────────────────────────────────────────
  
@@ -264,5 +316,9 @@ public class GatewayService {
             this.limit             = limit;
             this.retryAfterSeconds = retryAfterSeconds;
         }
+    }
+
+    public static class CircuitOpenException extends RuntimeException {
+        public CircuitOpenException(String message) { super(message); }
     }
 }

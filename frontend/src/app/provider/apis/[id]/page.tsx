@@ -9,7 +9,7 @@ import Toast from "@/components/ui/Toast";
 import { Input, Select, Textarea, Button } from "@/components/ui/FormFields";
 import {
   getApiById, getEndpoints, getDocuments, getVersions,
-  publishApi, deprecateApi, retireApi, createVersion,
+  publishApi, deprecateApi, retireApi, createVersion,updateApi,deleteApi,
   addEndpoint, deleteEndpoint, addDocument, deleteDocument, updateRateLimits,
 } from "@/lib/registry";
 import { getProviderSubscriptions, updateSubscriptionStatus } from "@/lib/portal";
@@ -56,6 +56,10 @@ export default function ApiDetailPage() {
   const [epForm, setEpForm]   = useState<CreateEndpointRequest>({ httpMethod: "GET", path: "", description: "", isAuthenticated: true });
   const [docForm, setDocForm] = useState<CreateDocumentRequest>({ title: "", docType: "markdown", content: "", docUrl: "" });
   const [newVer, setNewVer]   = useState("");
+
+  const [editModal, setEditModal] = useState(false);
+  const [editForm, setEditForm]   = useState({ apiName: "", description: "", baseUrl: "", visibility: "" });
+  const [editSaving, setEditSaving] = useState(false);
 
   const show = (message: string, type: ToastState["type"] = "success") => setToast({ message, type });
 
@@ -196,6 +200,15 @@ export default function ApiDetailPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-shrink-0">
+            <Button variant="ghost" onClick={() => {
+              setEditForm({
+                apiName:     api.apiName,
+                description: api.description ?? "",
+                baseUrl:     api.baseUrl,
+                visibility:  api.visibility,
+              });
+              setEditModal(true);
+            }}>✏️ Edit</Button>
             <Button variant="ghost" onClick={() => setVerModal(true)}>+ Version</Button>
             {api.status === "draft" && (
               <Button variant="primary" onClick={() => lifecycle(publishApi.bind(null, apiId), "published")} disabled={lcBusy}>
@@ -695,6 +708,56 @@ export default function ApiDetailPage() {
             <Button variant="primary" onClick={submitVersion} className="w-full">Create Version</Button>
           </div>
         </Modal>
+      )}
+
+      {editModal && (
+        <Modal title="Edit API" onClose={() => setEditModal(false)}>
+          <div className="flex flex-col gap-4">
+            <Input label="API Name *" value={editForm.apiName}
+              onChange={e => setEditForm(p => ({ ...p, apiName: e.target.value }))} />
+            <Input label="Base URL *" value={editForm.baseUrl}
+              onChange={e => setEditForm(p => ({ ...p, baseUrl: e.target.value }))} />
+            <Textarea label="Description" rows={3} value={editForm.description}
+              onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} />
+            <Select label="Visibility" value={editForm.visibility}
+              onChange={e => setEditForm(p => ({ ...p, visibility: e.target.value }))}>
+              <option value="public">🌐 Public — visible in marketplace</option>
+              <option value="private">🔒 Private — org members only</option>
+              <option value="restricted">🎯 Restricted — specific developers only</option>
+            </Select>
+            <Button variant="primary" disabled={editSaving} className="w-full"
+              onClick={async () => {
+                if (!editForm.apiName || !editForm.baseUrl) return show("Name and URL required", "error");
+                setEditSaving(true);
+                try {
+                  await updateApi(apiId, editForm);
+                  show("API updated");
+                  setEditModal(false);
+                  loadAll();
+                } catch (e: any) {
+                  show(e.response?.data?.error || "Failed to update", "error");
+                } finally { setEditSaving(false); }
+              }}>
+              {editSaving ? "Saving…" : "Save Changes"}
+            </Button>
+          </div>
+        </Modal>
+      )}
+
+
+      {api.status !== "published" && (
+        <button onClick={async () => {
+          if (!confirm("Delete this API?")) return;
+          try {
+            await deleteApi(apiId);
+            router.push("/provider/apis");
+          } catch (e: any) {
+            show(e.response?.data?.error || "Cannot delete", "error");
+          }
+        }}
+          className="px-4 py-2.5 bg-red-50 text-red-500 hover:bg-red-100 text-sm font-semibold rounded-xl transition-colors">
+          🗑 Delete
+        </button>
       )}
 
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}

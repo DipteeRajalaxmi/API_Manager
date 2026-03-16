@@ -21,6 +21,16 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+    display-request-duration: true
+    try-it-out-enabled: true
+
 management:
   endpoints:
     web:
@@ -31,3 +41,4 @@ jwt:
   secret: a8f3d2e1b9c7f4a6e2d8b3c1f7e9a4d2b6c8e3f1a7d4b9c2e6f8a3d1b7c4e9
   expiration: 86400000
   refresh-expiration: 604800000
+

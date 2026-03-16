@@ -79,8 +79,9 @@ export const getNavItems = (role: string) => {
         { href: "/provider/dashboard", icon: "dashboard", label: "Dashboard"   },
         { href: "/provider/apis",      icon: "apis",      label: "My APIs"     },
         { href: "/marketplace",        icon: "market",    label: "Marketplace" },
-        { href: "/provider/settings", icon: "settings", label: "Settings" },
-        { href: "/provider/developers", icon: "users", label: "Developers" }
+        { href: "/provider/developers", icon: "users", label: "Developers" },
+        { href: "/provider/analytics", icon: "analytics", label: "Analytics" },
+        { href: "/provider/settings", icon: "settings", label: "Settings" }
 
       ];
     case "DEVELOPER":
@@ -88,14 +89,16 @@ export const getNavItems = (role: string) => {
         { href: "/developer/dashboard", icon: "dashboard", label: "Dashboard"   },
         { href: "/marketplace",         icon: "market",    label: "Marketplace" },
         { href: "/developer/apps",      icon: "apps",      label: "My Apps"     },
+        { href: "/developer/analytics", icon: "analytics", label: "Analytics" },
         { href: "/developer/settings", icon: "settings", label: "Settings" }
       ];
     case "ADMIN":
       return [
-        { href: "/admin/dashboard",  icon: "dashboard", label: "Dashboard" },
-        { href: "/admin/users",      icon: "users",     label: "Users"     },
-        { href: "/admin/apis",       icon: "apis",      label: "All APIs"  },
-        { href: "/marketplace",      icon: "market",    label: "Marketplace" },
+        { href: "/admin/dashboard",      icon: "dashboard", label: "Dashboard"     },
+        { href: "/admin/users",          icon: "users",     label: "Users"         },
+        { href: "/admin/organizations",  icon: "market",    label: "Organizations" },
+        { href: "/admin/apis",           icon: "apis",      label: "All APIs"      },
+        { href: "/marketplace",          icon: "market",    label: "Marketplace"   },
       ];
     default:
       return [{ href: "/marketplace", icon: "market", label: "Marketplace" }];

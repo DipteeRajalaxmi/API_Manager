@@ -15,6 +15,9 @@ public interface ApiRepository extends JpaRepository<Api, Long> {
     boolean existsByApiNameAndVersionAndOrganization_OrgId(
         String apiName, String version, Long orgId);
 
+    long countByStatus(String status);
+    long countByOrganization_OrgId(Long orgId);
+
     @Query("""
         SELECT a FROM Api a
         WHERE a.status = 'published'

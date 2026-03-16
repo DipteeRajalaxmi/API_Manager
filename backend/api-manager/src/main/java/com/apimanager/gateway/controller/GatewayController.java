@@ -21,36 +21,37 @@ public class GatewayController {
 
     private final GatewayService gatewayService;
 
-     @RequestMapping("/**")
+    @RequestMapping("/**")
     public ResponseEntity<Object> proxy(
-            @RequestHeader(value = "X-API-Key", required = false) String apiKey,
             @RequestBody(required = false) String body,
             HttpMethod method,
             HttpServletRequest request
     ) {
-        // ── 1. API key required ───────────────────────────────────────────────
+        // ── Extract API key from multiple locations ────────────────────────────
+        String apiKey = extractApiKey(request);
+
         if (apiKey == null || apiKey.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Missing X-API-Key header"));
+                    .body(Map.of(
+                        "error", "Missing API key",
+                        "hint",  "Provide via X-API-Key header, Authorization: Bearer <key>, or ?api_key= query param"
+                    ));
         }
- 
-        // ── 2. Extract the path after /gateway/ ───────────────────────────────
-        String fullPath  = request.getRequestURI(); // e.g. /gateway/my-api/v1/users
-        String apiPath   = fullPath.replaceFirst("^/gateway/", ""); // e.g. my-api/v1/users
- 
+
+        String fullPath = request.getRequestURI();
+        String apiPath  = fullPath.replaceFirst("^/gateway/", "");
+
         try {
             GatewayResult result = gatewayService.handle(apiKey, apiPath, method, body, request);
- 
-            // ── 3. Build response with upstream body + rate limit headers ─────
             return ResponseEntity
                     .status(result.upstream().getStatusCode())
                     .headers(h -> addRateLimitHeaders(h, result.rateLimitHeaders()))
                     .body(result.upstream().getBody());
- 
+
         } catch (GatewayService.GatewayAuthException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", e.getMessage()));
- 
+
         } catch (GatewayService.RateLimitException e) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                     .header("Retry-After", String.valueOf(e.retryAfterSeconds))
@@ -61,14 +62,23 @@ public class GatewayController {
                             "remaining",         0,
                             "retryAfterSeconds", e.retryAfterSeconds
                     ));
- 
+
+        } catch (GatewayService.CircuitOpenException e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .header("Retry-After", "30")
+                    .body(Map.of(
+                            "error",   "Service temporarily unavailable",
+                            "reason",  "Circuit breaker open — provider backend is down",
+                            "retryAfterSeconds", 30
+                    ));
+
         } catch (Exception e) {
             log.error("Gateway error: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body(Map.of("error", "Gateway error: " + e.getMessage()));
         }
     }
- 
+
     private void addRateLimitHeaders(org.springframework.http.HttpHeaders h,
                                       RateLimitHeaders rl) {
         if (rl == null) return;
@@ -80,6 +90,26 @@ public class GatewayController {
         if (rl.remainingDay    != null) h.set("X-RateLimit-Remaining-Day",     String.valueOf(rl.remainingDay));
         if (rl.limitTotal      != null) h.set("X-RateLimit-Limit-Total",       String.valueOf(rl.limitTotal));
         if (rl.remainingTotal  != null) h.set("X-RateLimit-Remaining-Total",   String.valueOf(rl.remainingTotal));
+    }
+
+
+    private String extractApiKey(HttpServletRequest request) {
+        // Option 1: X-API-Key header
+        String key = request.getHeader("X-API-Key");
+        if (key != null && !key.isBlank()) return key;
+
+        // Option 2: Authorization: Bearer <key>
+        String auth = request.getHeader("Authorization");
+        if (auth != null && auth.startsWith("Bearer ")) {
+            String bearer = auth.substring(7).trim();
+            if (!bearer.isBlank()) return bearer;
+        }
+
+        // Option 3: ?api_key= query param
+        String param = request.getParameter("api_key");
+        if (param != null && !param.isBlank()) return param;
+
+        return null;
     }
 }
  
