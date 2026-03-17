@@ -11,6 +11,8 @@ import com.apimanager.registry.repository.ApiRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.apimanager.gateway.service.IpBlocklistService;
+
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -25,6 +27,8 @@ public class AdminController {
     private final ApiRepository          apiRepo;
     private final ApiUsageLogRepository  usageLogRepo;
     private final SubscriptionRepository subscriptionRepo;
+    private final IpBlocklistService ipBlocklist;
+
 
     // ── Platform stats ────────────────────────────────────────────────────────
     @GetMapping("/stats")
@@ -99,5 +103,22 @@ public class AdminController {
         }
 
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/blocklist/{ip}")
+    public ResponseEntity<Map<String, Object>> blockIp(@PathVariable String ip) {
+        ipBlocklist.blockIp(ip);
+        return ResponseEntity.ok(Map.of("message", "IP blocked: " + ip));
+    }
+
+    @DeleteMapping("/blocklist/{ip}")
+    public ResponseEntity<Map<String, Object>> unblockIp(@PathVariable String ip) {
+        ipBlocklist.unblockIp(ip);
+        return ResponseEntity.ok(Map.of("message", "IP unblocked: " + ip));
+    }
+
+    @GetMapping("/blocklist")
+    public ResponseEntity<Map<String, Object>> getBlocklist() {
+        return ResponseEntity.ok(Map.of("blockedIps", ipBlocklist.getBlockedIps()));
     }
 }

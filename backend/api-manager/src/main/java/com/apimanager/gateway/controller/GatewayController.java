@@ -9,6 +9,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import com.apimanager.gateway.service.IpBlocklistService;
+
  
 import java.util.Map;
  
@@ -20,14 +23,35 @@ import java.util.Map;
 public class GatewayController {
 
     private final GatewayService gatewayService;
+    private final IpBlocklistService ipBlocklist;
 
     @RequestMapping("/**")
     public ResponseEntity<Object> proxy(
-            @RequestBody(required = false) String body,
             HttpMethod method,
             HttpServletRequest request
     ) {
-        // ── Extract API key from multiple locations ────────────────────────────
+        // read raw bytes — handles JSON, XML, binary, multipart
+        byte[] body;
+        try {
+            body = request.getInputStream().readAllBytes();
+        } catch (Exception e) {
+            body = new byte[0];
+        }
+
+
+        // ── Request size limit (10MB) ─────────────────────────────────────────────
+        int MAX_BODY_SIZE = 10 * 1024 * 1024; // 10MB
+            if (body.length > MAX_BODY_SIZE) {
+                return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                        .body(Map.of(
+                            "error", "Request too large",
+                            "maxSizeBytes", MAX_BODY_SIZE,
+                            "receivedBytes", body.length
+                        ));
+        }
+
+
+        // ── Extract API key from multiple locations ──
         String apiKey = extractApiKey(request);
 
         if (apiKey == null || apiKey.isBlank()) {
@@ -35,6 +59,17 @@ public class GatewayController {
                     .body(Map.of(
                         "error", "Missing API key",
                         "hint",  "Provide via X-API-Key header, Authorization: Bearer <key>, or ?api_key= query param"
+                    ));
+        }
+            
+
+        // ── IP blocklist check ────
+        String clientIp = extractClientIp(request);
+        if (ipBlocklist.isBlocked(clientIp)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of(
+                        "error", "Access denied",
+                        "reason", "Your IP has been blocked"
                     ));
         }
 
@@ -45,7 +80,12 @@ public class GatewayController {
             GatewayResult result = gatewayService.handle(apiKey, apiPath, method, body, request);
             return ResponseEntity
                     .status(result.upstream().getStatusCode())
-                    .headers(h -> addRateLimitHeaders(h, result.rateLimitHeaders()))
+                    .headers(h -> {
+                        addRateLimitHeaders(h, result.rateLimitHeaders());
+                        // preserve content-type so images/PDFs/JSON all work
+                        MediaType contentType = result.upstream().getHeaders().getContentType();
+                        if (contentType != null) h.setContentType(contentType);
+                    })
                     .body(result.upstream().getBody());
 
         } catch (GatewayService.GatewayAuthException e) {
@@ -90,6 +130,13 @@ public class GatewayController {
         if (rl.remainingDay    != null) h.set("X-RateLimit-Remaining-Day",     String.valueOf(rl.remainingDay));
         if (rl.limitTotal      != null) h.set("X-RateLimit-Limit-Total",       String.valueOf(rl.limitTotal));
         if (rl.remainingTotal  != null) h.set("X-RateLimit-Remaining-Total",   String.valueOf(rl.remainingTotal));
+    }
+
+    private String extractClientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank())
+            return forwarded.split(",")[0].trim();
+        return request.getRemoteAddr();
     }
 
 

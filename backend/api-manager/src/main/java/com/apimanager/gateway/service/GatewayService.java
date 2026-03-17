@@ -13,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import com.apimanager.gateway.service.IpBlocklistService;
  
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -29,13 +30,14 @@ public class GatewayService {
     private final java.util.concurrent.ConcurrentHashMap<Long, CircuitBreakerState> circuitBreakers
     = new java.util.concurrent.ConcurrentHashMap<>();
 
-      public GatewayResult handle(
-            String rawKey,
-            String apiPath,
-            HttpMethod method,
-            String body,
-            HttpServletRequest request
-    ) {
+     public GatewayResult handle(
+        String rawKey,
+        String apiPath,
+        HttpMethod method,
+        byte[] body,
+        HttpServletRequest request
+        )
+    {
         long startMs = System.currentTimeMillis();
  
         // ── 1. Validate API key ──────────────────────────────────────────────
@@ -77,11 +79,11 @@ public class GatewayService {
         String targetUrl = buildTargetUrl(api.getBaseUrl(), apiPath, request.getQueryString());
  
         HttpHeaders forwardHeaders = buildForwardHeaders(request, sub);
-        HttpEntity<String> entity  = new HttpEntity<>(body, forwardHeaders);
- 
-        ResponseEntity<String> upstream;
+        HttpEntity<byte[]> entity  = new HttpEntity<>(body, forwardHeaders);
+
+        ResponseEntity<byte[]> upstream;
         try {
-            upstream = restTemplate.exchange(targetUrl, method, entity, String.class);
+            upstream = restTemplate.exchange(targetUrl, method, entity, byte[].class);
             circuit.recordSuccess();
         } catch (Exception e) {
             log.error("Gateway upstream error: {}", e.getMessage());
@@ -213,6 +215,7 @@ public class GatewayService {
                 usageLog.setHttpMethod(method);
                 usageLog.setEndpointPath("/" + path);
                 usageLog.setResponseStatus(status);
+                usageLog.setIpAddress(getClientIp(request));
                 usageLog.setLatencyMs(latency);
                 usageLog.setUserAgent(request.getHeader("User-Agent"));
                 usageLog.setWasRateLimited(rateLimited);
@@ -233,8 +236,9 @@ public class GatewayService {
     }
  
     // ── Inner result/exception classes ────────────────────────────────────────
- 
-    public record GatewayResult(ResponseEntity<String> upstream, RateLimitHeaders rateLimitHeaders) {}
+    // raw byte data 
+    public record GatewayResult(ResponseEntity<byte[]> upstream, RateLimitHeaders rateLimitHeaders) {}
+
  
     public static class RateLimitHeaders {
         public Long limitMinute, remainingMinute;

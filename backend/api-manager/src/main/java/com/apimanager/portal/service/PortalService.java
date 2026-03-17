@@ -86,7 +86,7 @@ public class PortalService {
         applicationRepo.delete(app);
     }
 
-    // ── Subscriptions ─────────────────────────────────────────────────────────
+    // ── Subscriptions ─────
 
     @Transactional
     public SubscriptionResponse subscribe(CreateSubscriptionRequest req, Long developerId) {
@@ -208,7 +208,7 @@ public class PortalService {
         return toSubResponse(subscriptionRepo.save(sub));
     }
 
-    // ── API Keys ──────────────────────────────────────────────────────────────
+    // ── API Keys ────
 
     public ApiKeyResponse getKeyForSubscription(Long subId, Long developerId) {
         Subscription sub = subscriptionRepo.findById(subId)
@@ -244,7 +244,7 @@ public class PortalService {
         return toKeyResponse(newKey, rawKey); // raw key shown once
     }
 
-    // ── Restricted Visibility ─────────────────────────────────────────────────
+    // ── Restricted Visibility ─────────
 
     public List<AllowedDeveloperResponse> getAllowedDevelopers(Long apiId, Long providerId) {
         Api api = getApiOwnedBy(apiId, providerId);
@@ -288,7 +288,7 @@ public class PortalService {
         allowedDevRepo.deleteByApi_ApiIdAndDeveloper_UserId(apiId, developerIdToRemove);
     }
 
-    // ── Rate Limits ───────────────────────────────────────────────────────────
+    // ── Rate Limits ─────
 
     @Transactional
     public void updateRateLimits(Long apiId, RateLimitRequest req, Long providerId) {
@@ -300,7 +300,7 @@ public class PortalService {
         apiRepo.save(api);
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    // ── Private helpers ─────
 
     /**
      * Generates a new API key for a subscription.
@@ -346,8 +346,7 @@ public class PortalService {
             .orElseThrow(() -> new ApiManagerException("User not found"));
     }
 
-    // ── Mappers ───────────────────────────────────────────────────────────────
-
+    // ── Mappers ──────
     private ApplicationResponse toAppResponse(Application app, int subCount) {
         ApplicationResponse r = new ApplicationResponse();
         r.setAppId(app.getAppId());
