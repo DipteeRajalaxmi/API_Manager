@@ -72,7 +72,7 @@ export const addEndpoint = async (
 };
 
 export const deleteEndpoint = async (endpointId: number): Promise<void> => {
-  await api.delete(`/api/endpoints/${endpointId}`);
+  await api.delete(`/api/apis/endpoints/${endpointId}`);
 };
 
 // ── Documents ─────────────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ export const addDocument = async (
 };
 
 export const deleteDocument = async (docId: number): Promise<void> => {
-  await api.delete(`/api/documents/${docId}`);
+  await api.delete(`/api/apis/documents/${docId}`);
 };
 
 
@@ -103,3 +103,51 @@ export const updateRateLimits = async (apiId: number, data: {
 }): Promise<void> => {
   await api.put(`/api/portal/provider/apis/${apiId}/rate-limits`, data);
 };
+
+
+// ── Add these to your existing /lib/registry.ts ──────────────────────────────
+// (paste below the existing exports)
+
+
+export interface ImportPreview {
+  apiName: string;
+  version: string;
+  description: string;
+  baseUrl: string;
+  endpoints: { method: string; path: string; description: string }[];
+}
+
+export interface ImportResult {
+  message: string;
+  apiId: number;
+  apiName: string;
+  version: string;
+  endpointCount: number;
+}
+
+/** Preview a Swagger file without saving — returns parsed metadata + endpoints */
+export const previewSwaggerFile = async (file: File): Promise<ImportPreview> => {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await api.post<ImportPreview>("/api/apis/swagger/import/preview", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+};
+
+/** Import from uploaded file — creates API in DRAFT */
+export const importSwaggerFile = async (file: File): Promise<ImportResult> => {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await api.post<ImportResult>("/api/apis/swagger/import", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+};
+
+/** Import from a remote Swagger URL — creates API in DRAFT */
+export const importSwaggerUrl = async (url: string): Promise<ImportResult> => {
+  const res = await api.post<ImportResult>("/api/apis/swagger/import-url", { url });
+  return res.data;
+};
+

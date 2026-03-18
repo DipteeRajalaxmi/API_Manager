@@ -11,6 +11,8 @@ import com.apimanager.portal.entity.ApiUsageLog;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.time.LocalDate;
+import java.time.ZoneId;
 
 @RestController
 @RequestMapping("/api/analytics")
@@ -32,7 +34,7 @@ public class AnalyticsController {
         Long orgId = user.getOrganization().getOrgId();
         LocalDateTime now = LocalDateTime.now();
 
-        long today = usageLogRepo.countCallsForOrg(orgId, now.minusDays(1));
+        long today = usageLogRepo.countCallsForOrg(orgId, LocalDate.now(ZoneId.of("Asia/Kolkata")).atStartOfDay());
         long week  = usageLogRepo.countCallsForOrg(orgId, now.minusDays(7));
         long month = usageLogRepo.countCallsForOrg(orgId, now.minusDays(30));
 
@@ -76,7 +78,7 @@ public class AnalyticsController {
 
         LocalDateTime now = LocalDateTime.now();
 
-        long today = usageLogRepo.countCallsForDeveloper(user.getUserId(), now.minusDays(1));
+        long today = usageLogRepo.countCallsForDeveloper(user.getUserId(), LocalDate.now(ZoneId.of("Asia/Kolkata")).atStartOfDay());
         long week  = usageLogRepo.countCallsForDeveloper(user.getUserId(), now.minusDays(7));
 
         List<Object[]> apiStats = usageLogRepo.apiStatsForDeveloper(user.getUserId(), now.minusDays(7));

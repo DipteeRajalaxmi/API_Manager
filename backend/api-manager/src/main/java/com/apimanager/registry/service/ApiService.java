@@ -71,7 +71,16 @@ public class ApiService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         Api api = getApiEntity(apiId);
 
-        if (!api.getCreatedBy().getEmail().equals(email)) {
+        User caller = userRepository.findByEmail(email)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+
+        boolean isCreator  = api.getCreatedBy().getUserId().equals(caller.getUserId());
+        boolean isOrgProvider = caller.getOrganization() != null
+            && api.getOrganization() != null
+            && caller.getOrganization().getOrgId().equals(api.getOrganization().getOrgId())
+            && "API_PROVIDER".equals(caller.getRole().getRoleName());
+
+        if (!isCreator && !isOrgProvider) {
             throw new RuntimeException("Not authorized to modify this API");
         }
         if (!api.getStatus().equals("draft")) {
@@ -85,7 +94,16 @@ public class ApiService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         Api api = getApiEntity(apiId);
 
-        if (!api.getCreatedBy().getEmail().equals(email)) {
+        User caller = userRepository.findByEmail(email)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+
+        boolean isCreator  = api.getCreatedBy().getUserId().equals(caller.getUserId());
+        boolean isOrgProvider = caller.getOrganization() != null
+            && api.getOrganization() != null
+            && caller.getOrganization().getOrgId().equals(api.getOrganization().getOrgId())
+            && "API_PROVIDER".equals(caller.getRole().getRoleName());
+
+        if (!isCreator && !isOrgProvider) {
             throw new RuntimeException("Not authorized to modify this API");
         }
         if (!api.getStatus().equals("published")) {
@@ -99,7 +117,16 @@ public class ApiService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         Api api = getApiEntity(apiId);
 
-        if (!api.getCreatedBy().getEmail().equals(email)) {
+        User caller = userRepository.findByEmail(email)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+
+        boolean isCreator  = api.getCreatedBy().getUserId().equals(caller.getUserId());
+        boolean isOrgProvider = caller.getOrganization() != null
+            && api.getOrganization() != null
+            && caller.getOrganization().getOrgId().equals(api.getOrganization().getOrgId())
+            && "API_PROVIDER".equals(caller.getRole().getRoleName());
+
+        if (!isCreator && !isOrgProvider) {
             throw new RuntimeException("Not authorized to modify this API");
         }
         if (!api.getStatus().equals("deprecated")) {
@@ -118,11 +145,19 @@ public class ApiService {
                 .stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    
     public List<ApiResponse> getMyApis() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        return apiRepository.findByCreatedBy_UserId(user.getUserId())
+
+        Organization org = user.getOrganization();
+        if (org == null)
+            return apiRepository.findByCreatedBy_UserId(user.getUserId())
+                    .stream().map(this::mapToResponse).collect(Collectors.toList());
+
+        // return ALL apis in org (own + developer submitted)
+        return apiRepository.findByOrganization_OrgId(org.getOrgId())
                 .stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
@@ -268,8 +303,17 @@ public class ApiService {
     public void deleteApi(Long apiId) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         Api api = getApiEntity(apiId);
-        if (!api.getCreatedBy().getEmail().equals(email)) {
-            throw new RuntimeException("Not authorized");
+        User caller = userRepository.findByEmail(email)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+
+        boolean isCreator  = api.getCreatedBy().getUserId().equals(caller.getUserId());
+        boolean isOrgProvider = caller.getOrganization() != null
+            && api.getOrganization() != null
+            && caller.getOrganization().getOrgId().equals(api.getOrganization().getOrgId())
+            && "API_PROVIDER".equals(caller.getRole().getRoleName());
+
+        if (!isCreator && !isOrgProvider) {
+            throw new RuntimeException("Not authorized to modify this API");
         }
         if (api.getStatus().equals("published")) {
             throw new RuntimeException("Cannot delete a published API. Deprecate it first.");

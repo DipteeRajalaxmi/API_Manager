@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import apiClient from "@/lib/api";
@@ -17,7 +17,6 @@ interface DailyCall {
   calls: number;
 }
 
-
 interface ProviderAnalytics {
   dailyCalls: DailyCall[];
   callsToday: number;
@@ -26,42 +25,89 @@ interface ProviderAnalytics {
   apiBreakdown: ApiStat[];
 }
 
-// ── Mini sparkline bar chart ──────────────────────────────────────────────────
+// ── Animated counter ──────────────────────────────────────────────────────────
+function Counter({ to, duration = 900 }: { to: number; duration?: number }) {
+  const [val, setVal] = useState(0);
+  const raf = useRef<number>(0);
+  useEffect(() => {
+    const start = performance.now();
+    const tick = (now: number) => {
+      const p = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      setVal(Math.round(ease * to));
+      if (p < 1) raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.current);
+  }, [to, duration]);
+  return <>{val.toLocaleString()}</>;
+}
+
+// ── SVG Bar chart ──────────────────────────────────────────────────────────────
 function BarChart({ data }: { data: { label: string; value: number }[] }) {
   const max = Math.max(...data.map(d => d.value), 1);
+  const [hovered, setHovered] = useState<number | null>(null);
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: "6px", height: "80px", padding: "0 4px" }}>
-      {data.map((d, i) => (
-        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-          <div style={{
-            width: "100%",
-            height: `${Math.max((d.value / max) * 64, d.value > 0 ? 4 : 0)}px`,
-            background: d.value > 0
-              ? "linear-gradient(180deg, #2dd4bf, #14b8a6)"
-              : "#f1f5f9",
-            borderRadius: "4px 4px 0 0",
-            transition: "height .5s ease",
-            position: "relative",
-          }}>
-            {d.value > 0 && (
+    <div style={{ display:"flex", alignItems:"flex-end", gap:8, height:120, padding:"0 4px 0" }}>
+      {data.map((d, i) => {
+        const pct = (d.value / max) * 88;
+        const isHot = hovered === i;
+        return (
+          <div key={i} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:6, position:"relative" }}
+            onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}>
+            {/* Tooltip */}
+            {isHot && d.value > 0 && (
               <div style={{
-                position: "absolute", top: "-20px", left: "50%", transform: "translateX(-50%)",
-                fontSize: "10px", fontWeight: 700, color: "#14b8a6", whiteSpace: "nowrap",
-              }}>{d.value}</div>
+                position:"absolute", top:-36, left:"50%", transform:"translateX(-50%)",
+                background:"#0f172a", color:"white", fontSize:11, fontWeight:700,
+                padding:"4px 8px", borderRadius:7, whiteSpace:"nowrap",
+                boxShadow:"0 4px 12px rgba(0,0,0,0.2)", zIndex:10,
+              }}>
+                {d.value} calls
+                <div style={{ position:"absolute", bottom:-4, left:"50%", transform:"translateX(-50%)",
+                  width:8, height:8, background:"#0f172a", clipPath:"polygon(0 0, 100% 0, 50% 100%)" }}/>
+              </div>
             )}
+            {/* Bar */}
+            <div style={{
+              width:"100%", position:"relative",
+              height:`${Math.max(pct, d.value > 0 ? 6 : 0)}px`,
+              borderRadius:"6px 6px 0 0",
+              background: d.value === 0
+                ? "rgba(241,245,249,0.6)"
+                : isHot
+                  ? "linear-gradient(180deg, #5eead4 0%, #0d9488 100%)"
+                  : "linear-gradient(180deg, #2dd4bf 0%, #14b8a6 100%)",
+              transition:"all 0.2s ease",
+              transform: isHot ? "scaleY(1.04)" : "scaleY(1)",
+              transformOrigin:"bottom",
+              boxShadow: isHot && d.value > 0 ? "0 -4px 16px rgba(20,184,166,0.4)" : "none",
+            }}/>
+            <span style={{ fontSize:9, color: isHot ? "#0d9488" : "#94a3b8",
+              fontWeight: isHot ? 700 : 600, transition:"color 0.15s", letterSpacing:"0.04em" }}>
+              {d.label}
+            </span>
           </div>
-          <div style={{ fontSize: "9px", color: "#94a3b8", fontWeight: 600, whiteSpace: "nowrap" }}>{d.label}</div>
-        </div>
-      ))}
+        );
+      })}
     </div>
+  );
+}
+
+// ── Sparkline for the stat cards ───────────────────────────────────────────────
+function MiniSparkline({ color }: { color: string }) {
+  const pts = [30,45,28,60,42,75,55,80,62,90].map((y,i) => `${i*11},${100-y}`).join(" ");
+  return (
+    <svg width="80" height="32" viewBox="0 0 99 100" fill="none" style={{ opacity:0.35 }}>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
   );
 }
 
 export default function ProviderAnalyticsPage() {
   const [data,    setData]    = useState<ProviderAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
-
-
+  const [sortBy,  setSortBy]  = useState<"calls"|"latency"|"errors">("calls");
 
   useEffect(() => {
     apiClient.get("/api/analytics/provider")
@@ -70,153 +116,306 @@ export default function ProviderAnalyticsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const maxCalls = Math.max(...(data?.apiBreakdown.map(a => Number(a.calls)) ?? [1]), 1);
-  const totalErrors = data?.apiBreakdown.reduce((s, a) => s + Number(a.errors), 0) ?? 0;
+  const totalErrors = data?.apiBreakdown.reduce((s,a) => s + Number(a.errors), 0) ?? 0;
   const avgLatency  = data?.apiBreakdown.length
-    ? Math.round(data.apiBreakdown.reduce((s, a) => s + Number(a.avgLatency), 0) / data.apiBreakdown.length)
+    ? Math.round(data.apiBreakdown.reduce((s,a) => s + Number(a.avgLatency), 0) / data.apiBreakdown.length)
     : 0;
 
+  const chartData = Array.from({ length: 7 }, (_,i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    const dateStr = d.toISOString().split("T")[0];
+    const label   = d.toLocaleDateString("en-IN", { weekday:"short" });
+    const found   = data?.dailyCalls.find(dc => dc.date === dateStr);
+    return { label, value: found ? Number(found.calls) : 0 };
+  });
 
-const chartData = Array.from({ length: 7 }, (_, i) => {
-  const d = new Date();
-  d.setDate(d.getDate() - (6 - i));
-  const dateStr = d.toISOString().split("T")[0]; // "2026-03-14"
-  const label   = d.toLocaleDateString("en-IN", { weekday: "short" });
-  const found   = data?.dailyCalls.find(dc => dc.date === dateStr);
-  return { label, value: found ? Number(found.calls) : 0 };
-});
+  const sorted = [...(data?.apiBreakdown ?? [])].sort((a,b) => {
+    if (sortBy === "calls")   return Number(b.calls) - Number(a.calls);
+    if (sortBy === "latency") return Number(b.avgLatency) - Number(a.avgLatency);
+    return Number(b.errors) - Number(a.errors);
+  });
+
+  const maxCalls = Math.max(...(data?.apiBreakdown.map(a => Number(a.calls)) ?? [1]), 1);
+
+  const statCards = [
+    { label:"Calls Today",      value: data?.callsToday ?? 0,     icon:"⚡", color:"#14b8a6", grad:"135deg,#0d9488,#0891b2", delay:0   },
+    { label:"Calls This Week",  value: data?.callsThisWeek ?? 0,  icon:"📅", color:"#6366f1", grad:"135deg,#6366f1,#8b5cf6", delay:60  },
+    { label:"Calls This Month", value: data?.callsThisMonth ?? 0, icon:"📈", color:"#f59e0b", grad:"135deg,#f59e0b,#f97316", delay:120 },
+    { label:"Avg Latency",      value: avgLatency,                  icon:"⏱", color:"#22c55e", grad:"135deg,#22c55e,#16a34a", suffix:"ms", delay:180 },
+  ];
 
   return (
     <DashboardLayout>
       <style>{`
-        :root {
-          --teal-400:#2dd4bf;--teal-500:#14b8a6;--teal-600:#0d9488;
-          --blue-500:#3b82f6;--purple-500:#8b5cf6;--red-500:#ef4444;
-          --green-500:#22c55e;--amber-500:#f59e0b;
-          --gray-50:#f8fafc;--gray-100:#f1f5f9;--gray-200:#e2e8f0;
-          --gray-400:#94a3b8;--gray-500:#64748b;--gray-700:#334155;--gray-800:#1e293b;
-          --white:#ffffff;--radius-xl:1.25rem;--radius-2xl:1.75rem;
-          --shadow-sm:0 1px 3px rgba(0,0,0,.06);--shadow-md:0 4px 16px rgba(0,0,0,.08);
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,700;9..40,800;9..40,900&family=DM+Mono:wght@400;500&display=swap');
+        @keyframes fadeUp   { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes shimmer  { 0%{background-position:-200% center} 100%{background-position:200% center} }
+        @keyframes barGrow  { from{transform:scaleY(0)} to{transform:scaleY(1)} }
+        @keyframes ping     { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:0} }
+
+        .an2 { font-family:'DM Sans',system-ui,sans-serif; padding:32px 36px 72px; background:#f8fafc; min-height:100vh; }
+        .an2 * { box-sizing:border-box; }
+
+        /* Hero header */
+        .hero-header {
+          background:linear-gradient(135deg,#0f172a 0%,#0d2d3a 50%,#0c2230 100%);
+          border-radius:24px; padding:28px 32px; margin-bottom:24px;
+          position:relative; overflow:hidden;
+          animation:fadeUp 0.4s ease both;
         }
-        .an-root{min-height:100vh;background:var(--gray-50);padding:2.5rem 2.5rem 4rem;font-family:'DM Sans',ui-sans-serif,system-ui,sans-serif;}
-        .an-header{margin-bottom:2rem;animation:fadeUp .5s ease both;}
-        .eyebrow{display:inline-flex;align-items:center;gap:.4rem;font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--teal-500);background:rgba(20,184,166,.08);border:1px solid rgba(20,184,166,.18);border-radius:99px;padding:.25rem .75rem;margin-bottom:.85rem;}
-        h1{font-size:1.75rem;font-weight:800;color:var(--gray-800);letter-spacing:-.03em;margin:0 0 .3rem;}
-        .sub{color:var(--gray-400);font-size:.875rem;margin:0;}
-        .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.1rem;margin-bottom:1.5rem;}
-        .stat-card{position:relative;background:var(--white);border-radius:var(--radius-2xl);padding:1.5rem;box-shadow:var(--shadow-sm);border:1px solid var(--gray-100);overflow:hidden;animation:fadeUp .5s ease both;transition:transform .2s,box-shadow .2s;}
-        .stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);}
-        .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent,var(--teal-500));border-radius:99px 99px 0 0;}
-        .stat-card::after{content:'';position:absolute;bottom:-20px;right:-12px;width:80px;height:80px;border-radius:50%;background:var(--accent,var(--teal-500));opacity:.05;}
-        .stat-icon{font-size:1.3rem;margin-bottom:.8rem;}
-        .stat-value{font-size:2.2rem;font-weight:900;color:var(--gray-800);letter-spacing:-.04em;line-height:1;margin-bottom:.3rem;}
-        .stat-label{font-size:.75rem;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:.07em;}
-        .grid-2{display:grid;grid-template-columns:1fr 320px;gap:1.25rem;margin-bottom:1.25rem;}
-        .panel{background:var(--white);border-radius:var(--radius-2xl);border:1px solid var(--gray-100);box-shadow:var(--shadow-sm);animation:fadeUp .55s ease both;overflow:hidden;}
-        .panel-head{display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem .75rem;}
-        .panel-title{font-size:.8rem;font-weight:700;color:var(--gray-700);text-transform:uppercase;letter-spacing:.08em;}
-        .panel-sub{font-size:.75rem;color:var(--gray-400);}
-        .chart-wrap{padding:.5rem 1.5rem 1.25rem;}
-        .table-header{display:grid;grid-template-columns:2.5fr 1fr 1fr 1fr 2fr 40px;gap:.75rem;padding:.6rem 1.5rem;background:var(--gray-50);border-bottom:1px solid var(--gray-100);font-size:.7rem;font-weight:700;color:var(--gray-400);text-transform:uppercase;letter-spacing:.08em;}
-        .table-row{display:grid;grid-template-columns:2.5fr 1fr 1fr 1fr 2fr 40px;gap:.75rem;padding:.9rem 1.5rem;border-bottom:1px solid var(--gray-50);align-items:center;cursor:pointer;transition:background .1s;}
-        .table-row:last-child{border-bottom:none;}
-        .table-row:hover{background:linear-gradient(90deg,rgba(20,184,166,.03),transparent);}
-        .api-avatar{width:1.9rem;height:1.9rem;border-radius:.5rem;background:linear-gradient(135deg,var(--teal-400),var(--teal-600));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:.8rem;flex-shrink:0;}
-        .api-name{font-size:.875rem;font-weight:600;color:var(--gray-800);text-decoration:none;}
-        .api-name:hover{color:var(--teal-600);}
-        .calls-bar{height:6px;background:var(--gray-100);border-radius:99px;overflow:hidden;margin-top:3px;}
-        .calls-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--teal-400),var(--teal-500));transition:width .6s ease;}
-        .badge{font-size:.72rem;font-weight:600;padding:.2rem .55rem;border-radius:.45rem;}
-        .badge-green{background:rgba(34,197,94,.1);color:var(--green-500);}
-        .badge-amber{background:rgba(245,158,11,.1);color:var(--amber-500);}
-        .badge-red{background:rgba(239,68,68,.1);color:var(--red-500);}
-        .arrow-btn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:.5rem;background:var(--gray-50);color:var(--gray-400);font-size:.75rem;transition:all .15s;text-decoration:none;}
-        .arrow-btn:hover{background:var(--teal-500);color:#fff;}
-        .top-api-row{display:flex;align-items:center;gap:.75rem;padding:.75rem 1.5rem;border-bottom:1px solid var(--gray-50);transition:background .1s;}
-        .top-api-row:last-child{border-bottom:none;}
-        .top-api-row:hover{background:var(--gray-50);}
-        .rank{font-size:.85rem;font-weight:800;color:var(--gray-300);width:1.25rem;text-align:center;}
-        .rank-1{color:#f59e0b;}
-        .rank-2{color:#94a3b8;}
-        .rank-3{color:#cd7f32;}
-        .empty-state{text-align:center;padding:3.5rem 1rem;}
-        .empty-state p{color:var(--gray-400);font-size:.875rem;margin:0 0 1rem;}
-        @keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
+        .hero-grid { position:absolute;inset:0;opacity:0.04;
+          background-image:linear-gradient(rgba(255,255,255,.5) 1px,transparent 1px),
+            linear-gradient(90deg,rgba(255,255,255,.5) 1px,transparent 1px);
+          background-size:32px 32px; }
+        .hero-glow { position:absolute;top:-40px;right:-40px;width:220px;height:220px;
+          border-radius:50%;background:radial-gradient(circle,rgba(20,184,166,.25),transparent 70%); }
+        .hero-glow2 { position:absolute;bottom:-60px;left:60px;width:160px;height:160px;
+          border-radius:50%;background:radial-gradient(circle,rgba(99,102,241,.2),transparent 70%); }
+        .hero-eyebrow { font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+          color:rgba(94,234,212,.8);margin-bottom:8px; }
+        .hero-title { font-size:26px;font-weight:900;color:white;margin:0 0 6px;letter-spacing:-.03em; }
+        .hero-sub { font-size:13px;color:rgba(255,255,255,.4);margin:0; }
+        .hero-live { display:inline-flex;align-items:center;gap:6px;
+          background:rgba(20,184,166,.15);border:1px solid rgba(20,184,166,.3);
+          color:#5eead4;font-size:11px;font-weight:700;
+          padding:4px 12px;border-radius:99px;margin-top:10px; }
+        .live-dot { width:6px;height:6px;border-radius:50%;background:#14b8a6; animation:ping 2s infinite; }
+
+        /* Stat cards */
+        .stats-row { display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px; }
+        .s-card {
+          background:white; border-radius:20px; padding:22px;
+          border:1px solid #f1f5f9;
+          box-shadow:0 1px 3px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.03);
+          position:relative; overflow:hidden;
+          animation:fadeUp 0.4s ease both;
+          transition:transform .2s,box-shadow .2s;
+          cursor:default;
+        }
+        .s-card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,0,0,.1); }
+        .s-card-accent { position:absolute;top:0;left:0;right:0;height:3px;border-radius:20px 20px 0 0; }
+        .s-card-glow { position:absolute;bottom:-16px;right:-8px;width:70px;height:70px;
+          border-radius:50%;opacity:.08; }
+        .s-card-icon { width:40px;height:40px;border-radius:12px;
+          display:flex;align-items:center;justify-content:center;
+          font-size:18px;margin-bottom:14px;position:relative;z-index:1; }
+        .s-card-val { font-size:32px;font-weight:900;color:#0f172a;
+          letter-spacing:-.04em;line-height:1;margin-bottom:4px;position:relative;z-index:1; }
+        .s-card-lbl { font-size:11px;font-weight:700;color:#94a3b8;
+          text-transform:uppercase;letter-spacing:.08em;position:relative;z-index:1; }
+        .s-card-spark { position:absolute;bottom:14px;right:16px; }
+
+        /* Two col */
+        .grid2 { display:grid;grid-template-columns:1fr 300px;gap:16px;margin-bottom:20px; }
+
+        /* Panels */
+        .panel {
+          background:white;border-radius:20px;
+          border:1px solid #f1f5f9;
+          box-shadow:0 1px 3px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.03);
+          overflow:hidden;
+          animation:fadeUp 0.45s ease both;
+        }
+        .ph { display:flex;align-items:center;justify-content:space-between;
+          padding:18px 22px 12px; border-bottom:1px solid #f8fafc; }
+        .ph-left { display:flex;align-items:center;gap:10px; }
+        .ph-icon { width:32px;height:32px;border-radius:9px;
+          display:flex;align-items:center;justify-content:center;
+          background:#f0fdfa; }
+        .pt { font-size:13px;font-weight:800;color:#0f172a;letter-spacing:-.01em; }
+        .ps { font-size:11px;color:#94a3b8;font-weight:500; }
+
+        /* Sort tabs */
+        .sort-tabs { display:flex;gap:4px; }
+        .sort-tab { font-size:11px;font-weight:600;padding:4px 10px;
+          border-radius:8px;border:none;cursor:pointer;transition:all .15s; }
+        .sort-tab.active { background:#0d9488;color:white; }
+        .sort-tab:not(.active) { background:#f8fafc;color:#94a3b8; }
+        .sort-tab:not(.active):hover { background:#f1f5f9;color:#475569; }
+
+        /* Table */
+        .thead { display:grid;grid-template-columns:2fr 90px 90px 90px 140px 36px;
+          gap:10px;padding:10px 22px;background:#fafafa;
+          font-size:10px;font-weight:700;color:#94a3b8;
+          text-transform:uppercase;letter-spacing:.08em;
+          border-bottom:1px solid #f1f5f9; }
+        .trow { display:grid;grid-template-columns:2fr 90px 90px 90px 140px 36px;
+          gap:10px;padding:14px 22px;border-bottom:1px solid #f8fafc;
+          align-items:center;cursor:pointer;transition:background .1s; text-decoration:none;
+          color:inherit; }
+        .trow:last-child { border-bottom:none; }
+        .trow:hover { background:linear-gradient(90deg,rgba(20,184,166,.04),transparent); }
+        .trow:hover .arr-btn { background:#0d9488;color:white; }
+
+        .api-av { width:34px;height:34px;border-radius:10px;
+          background:linear-gradient(135deg,#14b8a6,#0891b2);
+          display:flex;align-items:center;justify-content:center;
+          color:white;font-weight:800;font-size:14px;flex-shrink:0; }
+        .api-n { font-size:13px;font-weight:700;color:#0f172a; }
+        .api-id { font-size:10px;color:#94a3b8;font-family:'DM Mono',monospace;margin-top:1px; }
+
+        .num { font-size:14px;font-weight:800;color:#0f172a; }
+        .num-sub { font-size:10px;color:#94a3b8; }
+
+        .pill { font-size:10px;font-weight:700;padding:3px 9px;border-radius:7px; }
+        .pill-g { background:#f0fdf4;color:#16a34a; }
+        .pill-a { background:#fffbeb;color:#b45309; }
+        .pill-r { background:#fef2f2;color:#dc2626; }
+
+        .bar-track { height:5px;background:#f1f5f9;border-radius:99px;overflow:hidden;margin-top:3px; }
+        .bar-fill  { height:100%;border-radius:99px;
+          background:linear-gradient(90deg,#2dd4bf,#14b8a6);
+          transition:width .6s ease; }
+
+        .arr-btn { width:28px;height:28px;border-radius:8px;background:#f8fafc;
+          color:#94a3b8;display:flex;align-items:center;justify-content:center;
+          font-size:12px;transition:all .15s;text-decoration:none; }
+
+        /* Top APIs panel */
+        .top-row { display:flex;align-items:center;gap:10px;
+          padding:12px 22px;border-bottom:1px solid #f8fafc;
+          transition:background .1s;cursor:default; }
+        .top-row:last-child { border-bottom:none; }
+        .top-row:hover { background:#f8fafc; }
+        .rank-num { width:22px;text-align:center;font-size:13px;font-weight:900;color:#e2e8f0; }
+        .rank-1  { color:#f59e0b; }
+        .rank-2  { color:#94a3b8; }
+        .rank-3  { color:#c97c2e; }
+
+        .tfoot { display:flex;gap:20px;padding:12px 22px;
+          background:#fafafa;border-top:1px solid #f1f5f9; }
+        .tfoot-item { font-size:11px;color:#94a3b8; }
+        .tfoot-item strong { color:#475569; }
+
+        .empty { text-align:center;padding:56px 20px; }
+        .empty-icon { font-size:40px;margin-bottom:12px; }
+        .empty p { color:#94a3b8;font-size:13px;margin:0 0 16px; }
+
+        .shimmer {
+          background:linear-gradient(90deg,#f1f5f9 25%,#e8edf5 50%,#f1f5f9 75%);
+          background-size:200% auto; animation:shimmer 1.5s linear infinite;
+          border-radius:10px;
+        }
       `}</style>
 
-      <div className="an-root">
+      <div className="an2">
 
-        {/* Header */}
-        <div className="an-header">
-          <div className="eyebrow">📊 Analytics</div>
-          <h1>API Analytics</h1>
-          <p className="sub">Usage insights for your published APIs</p>
+        {/* ── HERO HEADER ─────────────────────────────────────────────────── */}
+        <div className="hero-header">
+          <div className="hero-grid"/>
+          <div className="hero-glow"/>
+          <div className="hero-glow2"/>
+          <div style={{ position:"relative", zIndex:1 }}>
+            <p className="hero-eyebrow">📊 Analytics Dashboard</p>
+            <h1 className="hero-title">API Performance Overview</h1>
+            <p className="hero-sub">Usage insights across all your published APIs</p>
+            <div className="hero-live">
+              <span className="live-dot"/>
+              Live data
+            </div>
+          </div>
         </div>
 
-        {/* Stats */}
-        <div className="stats-grid">
-          {[
-            { label: "Calls Today",      value: data?.callsToday ?? 0,      icon: "⚡", accent: "var(--teal-500)",   delay: 0   },
-            { label: "Calls This Week",  value: data?.callsThisWeek ?? 0,   icon: "📅", accent: "var(--blue-500)",   delay: 50  },
-            { label: "Calls This Month", value: data?.callsThisMonth ?? 0,  icon: "📈", accent: "var(--purple-500)", delay: 100 },
-            { label: "Total Errors",     value: totalErrors,                 icon: "⚠️", accent: "var(--red-500)",    delay: 150 },
-          ].map(s => (
-            <div key={s.label} className="stat-card" style={{ animationDelay: `${s.delay}ms`, "--accent": s.accent } as React.CSSProperties}>
-              <div className="stat-icon">{s.icon}</div>
-              <div className="stat-value">{loading ? "—" : s.value.toLocaleString()}</div>
-              <div className="stat-label">{s.label}</div>
+        {/* ── STAT CARDS ──────────────────────────────────────────────────── */}
+        <div className="stats-row">
+          {statCards.map((s,i) => (
+            <div key={s.label} className="s-card" style={{ animationDelay:`${s.delay}ms` }}>
+              <div className="s-card-accent" style={{ background:`linear-gradient(${s.grad})` }}/>
+              <div className="s-card-glow" style={{ background:`linear-gradient(${s.grad})` }}/>
+              <div className="s-card-icon" style={{ background:`linear-gradient(${s.grad})10` }}>
+                {s.icon}
+              </div>
+              <div className="s-card-val" style={{ color: loading ? "#e2e8f0" : "#0f172a" }}>
+                {loading ? "—" : <><Counter to={s.value}/>{s.suffix ?? ""}</>}
+              </div>
+              <div className="s-card-lbl">{s.label}</div>
+              <div className="s-card-spark"><MiniSparkline color={s.color}/></div>
             </div>
           ))}
         </div>
 
-        {/* Chart + Top APIs */}
-        <div className="grid-2" style={{ animationDelay: "180ms" }}>
+        {/* ── CHART + TOP APIs ─────────────────────────────────────────────── */}
+        <div className="grid2">
 
           {/* Bar chart */}
           <div className="panel">
-            <div className="panel-head">
-              <span className="panel-title">Daily Call Trend</span>
-              <span className="panel-sub">Last 7 days</span>
+            <div className="ph">
+              <div className="ph-left">
+                <div className="ph-icon">
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#0d9488" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                  </svg>
+                </div>
+                <div>
+                  <div className="pt">Daily Call Trend</div>
+                  <div className="ps">Last 7 days</div>
+                </div>
+              </div>
+              <div style={{ fontSize:11, fontWeight:700, color:"#14b8a6",
+                background:"rgba(20,184,166,.08)", border:"1px solid rgba(20,184,166,.15)",
+                padding:"3px 10px", borderRadius:8 }}>
+                {chartData.reduce((s,d) => s + d.value, 0).toLocaleString()} total
+              </div>
             </div>
-            <div className="chart-wrap">
+            <div style={{ padding:"12px 22px 18px" }}>
               {loading
-                ? <div style={{ height: "80px", background: "var(--gray-50)", borderRadius: "12px", animation: "pulse 1.5s infinite" }} />
-                : <BarChart data={chartData} />
+                ? <div className="shimmer" style={{ height:120 }}/>
+                : <BarChart data={chartData}/>
               }
             </div>
           </div>
 
           {/* Top APIs */}
           <div className="panel">
-            <div className="panel-head">
-              <span className="panel-title">Top APIs</span>
-              <span className="panel-sub">By calls</span>
+            <div className="ph">
+              <div className="ph-left">
+                <div className="ph-icon">
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#0d9488" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                  </svg>
+                </div>
+                <div>
+                  <div className="pt">Top APIs</div>
+                  <div className="ps">By call volume</div>
+                </div>
+              </div>
             </div>
+
             {loading ? (
-              <div style={{ padding: "1rem 1.5rem" }}>
-                {[...Array(3)].map((_, i) => (
-                  <div key={i} style={{ height: "36px", background: "var(--gray-100)", borderRadius: "8px", marginBottom: "8px", animation: "pulse 1.5s infinite" }} />
+              <div style={{ padding:"12px 22px", display:"flex", flexDirection:"column", gap:8 }}>
+                {[...Array(4)].map((_,i) => (
+                  <div key={i} className="shimmer" style={{ height:44, animationDelay:`${i*100}ms` }}/>
                 ))}
               </div>
             ) : !data?.apiBreakdown?.length ? (
-              <div className="empty-state"><p>No data yet</p></div>
+              <div className="empty"><p>No data yet</p></div>
             ) : (
-              data.apiBreakdown.slice(0, 5).map((api, i) => (
-                <div key={api.apiId} className="top-api-row">
-                  <span className={`rank ${i === 0 ? "rank-1" : i === 1 ? "rank-2" : i === 2 ? "rank-3" : ""}`}>
-                    {i + 1}
+              data.apiBreakdown.slice(0,5).map((api,i) => (
+                <div key={api.apiId} className="top-row">
+                  <span className={`rank-num ${i===0?"rank-1":i===1?"rank-2":i===2?"rank-3":""}`}>
+                    {i+1}
                   </span>
-                  <div className="api-avatar" style={{ width: "1.6rem", height: "1.6rem", fontSize: ".7rem" }}>
+                  <div style={{ width:30, height:30, borderRadius:9,
+                    background:`hsl(${180+i*18},70%,${40+i*3}%)`,
+                    display:"flex",alignItems:"center",justifyContent:"center",
+                    color:"white",fontWeight:800,fontSize:12,flexShrink:0 }}>
                     {api.apiName[0]?.toUpperCase()}
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: ".8rem", fontWeight: 600, color: "var(--gray-800)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:12, fontWeight:700, color:"#0f172a",
+                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
                       {api.apiName}
                     </div>
+                    <div style={{ fontSize:10, color:"#94a3b8" }}>
+                      {Number(api.calls).toLocaleString()} calls
+                    </div>
                   </div>
-                  <div style={{ fontSize: ".8rem", fontWeight: 700, color: "var(--teal-600)" }}>
-                    {Number(api.calls).toLocaleString()}
+                  <div style={{
+                    fontSize:12, fontWeight:800,
+                    color: i===0?"#0d9488":i===1?"#6366f1":i===2?"#f59e0b":"#94a3b8",
+                  }}>
+                    {Math.round((Number(api.calls)/maxCalls)*100)}%
                   </div>
                 </div>
               ))
@@ -224,77 +423,129 @@ const chartData = Array.from({ length: 7 }, (_, i) => {
           </div>
         </div>
 
-        {/* API Breakdown Table */}
-        <div className="panel" style={{ animationDelay: "220ms" }}>
-          <div className="panel-head">
-            <span className="panel-title">API Breakdown</span>
-            <span className="panel-sub">Click any row for detailed analytics</span>
+        {/* ── API BREAKDOWN TABLE ──────────────────────────────────────────── */}
+        <div className="panel">
+          <div className="ph">
+            <div className="ph-left">
+              <div className="ph-icon">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#0d9488" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18M10 3v18M14 3v18"/>
+                </svg>
+              </div>
+              <div>
+                <div className="pt">API Breakdown</div>
+                <div className="ps">Click any row for detailed analytics</div>
+              </div>
+            </div>
+            {/* Sort controls */}
+            <div className="sort-tabs">
+              {(["calls","latency","errors"] as const).map(s => (
+                <button key={s} className={`sort-tab ${sortBy===s?"active":""}`}
+                  onClick={() => setSortBy(s)}>
+                  {s === "calls" ? "Calls" : s === "latency" ? "Latency" : "Errors"}
+                </button>
+              ))}
+            </div>
           </div>
 
           {loading ? (
-            <div className="empty-state"><p>Loading analytics…</p></div>
-          ) : !data?.apiBreakdown?.length ? (
-            <div className="empty-state">
-              <p style={{ fontSize: "2rem", marginBottom: "1rem" }}>📊</p>
+            <div style={{ padding:"16px 22px", display:"flex", flexDirection:"column", gap:10 }}>
+              {[...Array(3)].map((_,i) => (
+                <div key={i} className="shimmer" style={{ height:56, animationDelay:`${i*80}ms` }}/>
+              ))}
+            </div>
+          ) : !sorted.length ? (
+            <div className="empty">
+              <div className="empty-icon">📊</div>
               <p>No usage data yet. Make API calls through the gateway to see analytics.</p>
-              <Link href="/provider/apis" style={{ color: "var(--teal-500)", fontSize: ".875rem", fontWeight: 600 }}>View My APIs →</Link>
+              <Link href="/provider/apis" style={{ color:"#0d9488", fontSize:13, fontWeight:700 }}>
+                View My APIs →
+              </Link>
             </div>
           ) : (
             <>
-              <div className="table-header">
+              <div className="thead">
                 <div>API</div>
                 <div>Calls</div>
                 <div>Avg Latency</div>
                 <div>Errors</div>
-                <div>Call Volume</div>
-                <div />
+                <div>Volume</div>
+                <div/>
               </div>
-              {data.apiBreakdown.map(api => {
-                const pct     = Math.round((Number(api.calls) / maxCalls) * 100);
+
+              {sorted.map((api, idx) => {
+                const pct     = Math.round((Number(api.calls)/maxCalls)*100);
                 const latency = Number(api.avgLatency);
                 const errors  = Number(api.errors);
-                const latencyClass = latency < 200 ? "badge-green" : latency < 500 ? "badge-amber" : "badge-red";
+                const errRate = api.calls > 0 ? Math.round((errors/Number(api.calls))*100) : 0;
+                const latClass = latency < 200 ? "pill-g" : latency < 500 ? "pill-a" : "pill-r";
 
                 return (
-                  <Link key={api.apiId} href={`/provider/analytics/${api.apiId}`} style={{ textDecoration: "none", display: "block" }}>
-                    <div className="table-row">
-                      <div style={{ display: "flex", alignItems: "center", gap: ".75rem" }}>
-                        <div className="api-avatar">{api.apiName[0]?.toUpperCase()}</div>
-                        <span className="api-name">{api.apiName}</span>
-                      </div>
-                      <div style={{ fontSize: ".875rem", fontWeight: 700, color: "var(--gray-800)" }}>
-                        {Number(api.calls).toLocaleString()}
-                      </div>
-                      <div>
-                        <span className={`badge ${latencyClass}`}>{latency}ms</span>
+                  <Link key={api.apiId} href={`/provider/analytics/${api.apiId}`}
+                    className="trow" style={{ animationDelay:`${idx*40}ms` }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                      <div className="api-av" style={{
+                        background:`linear-gradient(135deg, hsl(${180+idx*18},70%,42%), hsl(${200+idx*18},75%,38%))`,
+                      }}>
+                        {api.apiName[0]?.toUpperCase()}
                       </div>
                       <div>
-                        <span className={`badge ${errors === 0 ? "badge-green" : "badge-red"}`}>
-                          {errors === 0 ? "✓ None" : `${errors} errors`}
-                        </span>
+                        <div className="api-n">{api.apiName}</div>
+                        <div className="api-id">ID #{api.apiId}</div>
                       </div>
-                      <div style={{ paddingRight: ".5rem" }}>
-                        <div style={{ fontSize: ".7rem", color: "var(--gray-400)", marginBottom: "3px" }}>{pct}% of total</div>
-                        <div className="calls-bar">
-                          <div className="calls-fill" style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                      <span className="arrow-btn">→</span>
                     </div>
+
+                    <div>
+                      <div className="num">{Number(api.calls).toLocaleString()}</div>
+                      <div className="num-sub">requests</div>
+                    </div>
+
+                    <div>
+                      <span className={`pill ${latClass}`}>{latency}ms</span>
+                      <div className="num-sub" style={{ marginTop:3 }}>
+                        {latency < 200 ? "Fast" : latency < 500 ? "Moderate" : "Slow"}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className={`pill ${errors === 0 ? "pill-g" : errRate > 10 ? "pill-r" : "pill-a"}`}>
+                        {errors === 0 ? "✓ 0" : errors}
+                      </span>
+                      {errors > 0 && <div className="num-sub" style={{ marginTop:3 }}>{errRate}% rate</div>}
+                    </div>
+
+                    <div style={{ paddingRight:4 }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                        <span style={{ fontSize:10, color:"#94a3b8" }}>{pct}% of traffic</span>
+                      </div>
+                      <div className="bar-track">
+                        <div className="bar-fill" style={{ width:`${pct}%`,
+                          background:`linear-gradient(90deg,hsl(${180+idx*18},60%,52%),hsl(${200+idx*18},65%,42%))`,
+                        }}/>
+                      </div>
+                    </div>
+
+                    <span className="arr-btn">→</span>
                   </Link>
                 );
               })}
 
-              {/* Footer */}
-              <div style={{ padding: ".75rem 1.5rem", background: "var(--gray-50)", borderTop: "1px solid var(--gray-100)", display: "flex", gap: "1.5rem" }}>
-                <span style={{ fontSize: ".75rem", color: "var(--gray-400)" }}>
-                  {data.apiBreakdown.length} API{data.apiBreakdown.length !== 1 ? "s" : ""}
+              <div className="tfoot">
+                <span className="tfoot-item">
+                  {sorted.length} API{sorted.length !== 1 ? "s" : ""}
                 </span>
-                <span style={{ fontSize: ".75rem", color: "var(--gray-400)" }}>
-                  Avg latency: <strong style={{ color: "var(--gray-600)" }}>{avgLatency}ms</strong>
+                <span className="tfoot-item">
+                  Avg latency: <strong>{avgLatency}ms</strong>
                 </span>
-                <span style={{ fontSize: ".75rem", color: "var(--gray-400)" }}>
-                  Total errors: <strong style={{ color: totalErrors > 0 ? "var(--red-500)" : "var(--green-500)" }}>{totalErrors}</strong>
+                <span className="tfoot-item">
+                  Total errors: <strong style={{ color: totalErrors > 0 ? "#dc2626" : "#16a34a" }}>
+                    {totalErrors}
+                  </strong>
+                </span>
+                <span className="tfoot-item" style={{ marginLeft:"auto" }}>
+                  Total calls: <strong>
+                    {(data?.apiBreakdown.reduce((s,a) => s + Number(a.calls), 0) ?? 0).toLocaleString()}
+                  </strong>
                 </span>
               </div>
             </>
