@@ -71,6 +71,22 @@ export const addEndpoint = async (
   return res.data;
 };
 
+export async function updateEndpoint(
+  endpointId: number,
+  data: {
+    httpMethod?: string;
+    path?: string;
+    description?: string;
+    isAuthenticated?: boolean;
+    rateLimitPerMinute?: number | null;
+    rateLimitPerHour?: number | null;
+    rateLimitPerDay?: number | null;
+  }
+): Promise<ApiEndpoint> {
+  const res = await api.put(`/api/apis/endpoints/${endpointId}`, data);
+  return res.data;
+}
+
 export const deleteEndpoint = async (endpointId: number): Promise<void> => {
   await api.delete(`/api/apis/endpoints/${endpointId}`);
 };

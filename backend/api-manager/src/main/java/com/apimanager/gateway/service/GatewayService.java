@@ -14,6 +14,8 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import com.apimanager.gateway.service.IpBlocklistService;
+import com.apimanager.registry.entity.ApiEndpoint;
+import java.util.List;
  
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -57,11 +59,28 @@ public class GatewayService {
  
         // ── 3. Check rate limits ─────────────────────────────────────────────
         Api api = sub.getApi();
+        String normalizedPath = "/" + apiPath;
+
+        // 3a. Match endpoint
+        ApiEndpoint matchedEndpoint = findMatchingEndpoint(api, normalizedPath, method.name());
+
+        // 3b. Check endpoint-level rate limits first
+        if (matchedEndpoint != null) {
+            RateLimitResult epRl = checkEndpointRateLimits(
+                    sub.getSubscriptionId(), matchedEndpoint, normalizedPath);
+            if (epRl.exceeded) {
+                logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
+                        429L, System.currentTimeMillis() - startMs, true,
+                        "ENDPOINT_" + epRl.limitType);
+                throw new RateLimitException(
+                        "ENDPOINT_" + epRl.limitType, epRl.limit, epRl.retryAfterSeconds);
+            }
+        }
+
+        // 3c. Check API-level rate limits
         RateLimitResult rl = checkRateLimits(sub.getSubscriptionId(), api);
- 
         if (rl.exceeded) {
-            // log the rejected call
-            logCall(apiKey, sub, apiPath, method.name(), request,
+            logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
                     429L, System.currentTimeMillis() - startMs, true, rl.limitType);
             throw new RateLimitException(rl.limitType, rl.limit, rl.retryAfterSeconds);
         }
@@ -70,7 +89,7 @@ public class GatewayService {
         Long apiId = api.getApiId();
         CircuitBreakerState circuit = circuitBreakers.computeIfAbsent(apiId, k -> new CircuitBreakerState());
         if (circuit.isOpen()) {
-            logCall(apiKey, sub, apiPath, method.name(), request,
+            logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
                     503L, System.currentTimeMillis() - startMs, false, null);
             throw new CircuitOpenException("Circuit open for API: " + api.getApiName());
         }
@@ -89,16 +108,16 @@ public class GatewayService {
             log.error("Gateway upstream error: {}", e.getMessage());
             circuit.recordFailure(); 
             // log failed call
-            logCall(apiKey, sub, apiPath, method.name(), request,
-                    502L, System.currentTimeMillis() - startMs, false, null);
+            logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
+                502L, System.currentTimeMillis() - startMs, false, null);
             throw new ApiManagerException("Upstream service error: " + e.getMessage());
         }
  
         long latency = System.currentTimeMillis() - startMs;
  
         // ── 5. Log successful call ────────────────────────────────────────────
-        logCall(apiKey, sub, apiPath, method.name(), request,
-                (long) upstream.getStatusCode().value(), latency, false, null);
+        logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
+            (long) upstream.getStatusCode().value(), latency, false, null);
         
  
         // ── 6. Update key last_used_at ────────────────────────────────────────
@@ -106,7 +125,8 @@ public class GatewayService {
         apiKeyRepo.save(apiKey);
  
         // ── 7. Build rate limit headers for response ──────────────────────────
-        RateLimitHeaders headers = buildRateLimitHeaders(sub.getSubscriptionId(), api);
+        RateLimitHeaders headers = buildRateLimitHeaders(
+            sub.getSubscriptionId(), api, matchedEndpoint, normalizedPath);
  
         return new GatewayResult(upstream, headers);
     }
@@ -143,7 +163,8 @@ public class GatewayService {
         return RateLimitResult.ok();
     }
  
-    private RateLimitHeaders buildRateLimitHeaders(Long subId, Api api) {
+    private RateLimitHeaders buildRateLimitHeaders(
+        Long subId, Api api, ApiEndpoint endpoint, String path) {
         LocalDateTime now = LocalDateTime.now();
         RateLimitHeaders h = new RateLimitHeaders();
  
@@ -166,6 +187,24 @@ public class GatewayService {
             long used = usageLogRepo.countTotalCalls(subId);
             h.remainingTotal = Math.max(0, api.getRateLimitTotal() - used);
             h.limitTotal     = api.getRateLimitTotal();
+        }
+        // Endpoint level headers
+        if (endpoint != null) {
+            if (endpoint.getRateLimitPerMinute() != null) {
+                long used = usageLogRepo.countCallsSinceForEndpoint(subId, path, now.minusMinutes(1));
+                h.endpointLimitMinute     = endpoint.getRateLimitPerMinute();
+                h.endpointRemainingMinute = Math.max(0, endpoint.getRateLimitPerMinute() - used);
+            }
+            if (endpoint.getRateLimitPerHour() != null) {
+                long used = usageLogRepo.countCallsSinceForEndpoint(subId, path, now.minusHours(1));
+                h.endpointLimitHour     = endpoint.getRateLimitPerHour();
+                h.endpointRemainingHour = Math.max(0, endpoint.getRateLimitPerHour() - used);
+            }
+            if (endpoint.getRateLimitPerDay() != null) {
+                long used = usageLogRepo.countCallsSinceForEndpoint(subId, path, now.minusDays(1));
+                h.endpointLimitDay     = endpoint.getRateLimitPerDay();
+                h.endpointRemainingDay = Math.max(0, endpoint.getRateLimitPerDay() - used);
+            }
         }
         return h;
     }
@@ -202,8 +241,8 @@ public class GatewayService {
         return headers;
     }
  
-    private void logCall(ApiKey apiKey, Subscription sub, String path,
-                         String method, HttpServletRequest request,
+        private void logCall(ApiKey apiKey, Subscription sub, ApiEndpoint endpoint,
+                     String path, String method, HttpServletRequest request,
                          Long status, Long latency,
                          boolean rateLimited, String rateLimitType) {
         try {
@@ -221,6 +260,7 @@ public class GatewayService {
                 usageLog.setWasRateLimited(rateLimited);
                 usageLog.setRateLimitType(rateLimitType);
                 usageLog.setRequestTime(LocalDateTime.now());
+                usageLog.setEndpoint(endpoint);
                 usageLogRepo.save(usageLog);
         } catch (Exception e) {
         e.printStackTrace();
@@ -245,6 +285,9 @@ public class GatewayService {
         public Long limitHour,   remainingHour;
         public Long limitDay,    remainingDay;
         public Long limitTotal,  remainingTotal;
+        public Long endpointLimitMinute,     endpointRemainingMinute;
+        public Long endpointLimitHour,       endpointRemainingHour;
+        public Long endpointLimitDay,        endpointRemainingDay;
     }
  
     private static class RateLimitResult {
@@ -324,5 +367,49 @@ public class GatewayService {
 
     public static class CircuitOpenException extends RuntimeException {
         public CircuitOpenException(String message) { super(message); }
+    }
+
+    private ApiEndpoint findMatchingEndpoint(Api api, String requestPath, String method) {
+        if (api.getEndpoints() == null || api.getEndpoints().isEmpty()) return null;
+        // exact match with method first
+        for (ApiEndpoint ep : api.getEndpoints()) {
+            if (ep.getHttpMethod().equalsIgnoreCase(method) && pathMatches(ep.getPath(), requestPath))
+                return ep;
+        }
+        // fallback: path only
+        for (ApiEndpoint ep : api.getEndpoints()) {
+            if (pathMatches(ep.getPath(), requestPath)) return ep;
+        }
+        return null;
+    }
+
+    private boolean pathMatches(String template, String actual) {
+        if (template == null || actual == null) return false;
+        if (template.equals(actual)) return true;
+        String t = template.endsWith("/") ? template.substring(0, template.length()-1) : template;
+        String a = actual.endsWith("/")   ? actual.substring(0, actual.length()-1)     : actual;
+        String regex = t.replaceAll("\\{[^}]+\\}", "[^/]+").replace("/", "\\/");
+        return a.matches(regex);
+    }
+
+    private RateLimitResult checkEndpointRateLimits(
+            Long subId, ApiEndpoint endpoint, String path) {
+        LocalDateTime now = LocalDateTime.now();
+        if (endpoint.getRateLimitPerMinute() != null) {
+            long used = usageLogRepo.countCallsSinceForEndpoint(subId, path, now.minusMinutes(1));
+            if (used >= endpoint.getRateLimitPerMinute())
+                return RateLimitResult.exceeded("PER_MINUTE", endpoint.getRateLimitPerMinute(), 60);
+        }
+        if (endpoint.getRateLimitPerHour() != null) {
+            long used = usageLogRepo.countCallsSinceForEndpoint(subId, path, now.minusHours(1));
+            if (used >= endpoint.getRateLimitPerHour())
+                return RateLimitResult.exceeded("PER_HOUR", endpoint.getRateLimitPerHour(), 3600);
+        }
+        if (endpoint.getRateLimitPerDay() != null) {
+            long used = usageLogRepo.countCallsSinceForEndpoint(subId, path, now.minusDays(1));
+            if (used >= endpoint.getRateLimitPerDay())
+                return RateLimitResult.exceeded("PER_DAY", endpoint.getRateLimitPerDay(), 86400);
+        }
+        return RateLimitResult.ok();
     }
 }

@@ -14,4 +14,7 @@ public class ApiEndpointRequest {
     private String requestSchema;
     private String responseSchema;
     private Boolean isAuthenticated;
+    private Long rateLimitPerMinute;
+    private Long rateLimitPerHour;
+    private Long rateLimitPerDay;
 }

@@ -9,6 +9,10 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import com.apimanager.identity.entity.Role;
+import com.apimanager.identity.repository.RoleRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -16,6 +20,8 @@ import java.util.stream.Collectors;
 public class UserService {
     
  private final UserRepository userRepository;
+ private final RoleRepository roleRepository;
+ private final PasswordEncoder passwordEncoder;
 
     // Get all users — admin use
     public List<UserResponse> getAllUsers() {
@@ -78,5 +84,36 @@ public class UserService {
                 .filter(u -> u.getRole() != null && "DEVELOPER".equals(u.getRole().getRoleName()))
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+
+
+    public Map<String, Object> addDeveloperToOrg(String name, String email, String password, String providerEmail) {
+        User provider = userRepository.findByEmail(providerEmail)
+                .orElseThrow(() -> new RuntimeException("Provider not found"));
+
+        if (provider.getOrganization() == null)
+            throw new RuntimeException("You don't have an organization");
+
+        if (userRepository.findByEmail(email).isPresent())
+            throw new RuntimeException("Email already registered");
+
+        Role devRole = roleRepository.findByRoleName("DEVELOPER")
+                .orElseThrow(() -> new RuntimeException("DEVELOPER role not found"));
+
+        User dev = new User();
+        dev.setEmail(email);
+        dev.setName(name);
+        dev.setPasswordHash(passwordEncoder.encode(password != null && !password.isBlank() ? password : "12345678"));
+        dev.setRole(devRole);
+        dev.setOrganization(provider.getOrganization());
+        dev.setStatus("active");
+
+        userRepository.save(dev);
+
+        return Map.of(
+            "message",  "Developer added successfully",
+            "email",    email,
+            "password", "12345678"
+        );
     }
 }

@@ -13,6 +13,7 @@ import com.apimanager.common.security.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -108,6 +109,9 @@ public class AuthService {
             throw new RuntimeException("Account is not active");
         }
 
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
+
         // Generate tokens
         String token        = jwtUtil.generateToken(user.getEmail(), user.getRole().getRoleName(), user.getUserId());
         String refreshToken = jwtUtil.generateRefreshToken(user.getEmail());
@@ -120,6 +124,8 @@ public class AuthService {
                 .role(user.getRole().getRoleName())
                 .userId(user.getUserId())
                 .orgId(user.getOrganization() != null ? user.getOrganization().getOrgId() : null)
+             // .orgName(user.getOrganization() != null ? user.getOrganization().getOrgName() : null)
+             // .inviteCode(user.getOrganization() != null ? user.getOrganization().getInviteCode() : null)
                 .build();
     }
 

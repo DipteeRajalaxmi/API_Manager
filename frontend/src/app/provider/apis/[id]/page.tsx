@@ -9,19 +9,16 @@ import Toast from "@/components/ui/Toast";
 import { Input, Select, Textarea, Button } from "@/components/ui/FormFields";
 import {
   getApiById, getEndpoints, getDocuments, getVersions,
-  publishApi, deprecateApi, retireApi, createVersion,updateApi,deleteApi,
-  addEndpoint, deleteEndpoint, addDocument, deleteDocument, updateRateLimits,
+  publishApi, deprecateApi, retireApi, createVersion, updateApi, deleteApi,
+  addEndpoint, deleteEndpoint, addDocument, deleteDocument, updateRateLimits, updateEndpoint,
 } from "@/lib/registry";
 import { getProviderSubscriptions, updateSubscriptionStatus } from "@/lib/portal";
 import {
   Api, ApiEndpoint, ApiDocument, ToastState, HttpMethod,
   CreateEndpointRequest, CreateDocumentRequest, Subscription,
 } from "@/types/api";
-
 import { UserResponse } from "@/types/auth";
-import {
-  getAllowedDevelopers, addAllowedDeveloper, removeAllowedDeveloper,
-} from "@/lib/portal";
+import { getAllowedDevelopers, addAllowedDeveloper, removeAllowedDeveloper } from "@/lib/portal";
 import apiClient from "@/lib/api";
 
 type Tab = "endpoints" | "documents" | "versions" | "ratelimits" | "subscribers" | "restricted";
@@ -31,14 +28,14 @@ export default function ApiDetailPage() {
   const router  = useRouter();
   const apiId   = Number(id);
 
-  const [api, setApi]             = useState<Api | null>(null);
-  const [endpoints, setEndpoints] = useState<ApiEndpoint[]>([]);
-  const [documents, setDocuments] = useState<ApiDocument[]>([]);
-  const [versions, setVersions]   = useState<Api[]>([]);
-  const [subs, setSubs]           = useState<Subscription[]>([]);
-  const [tab, setTab]             = useState<Tab>("endpoints");
-  const [toast, setToast]         = useState<ToastState | null>(null);
-  const [lcBusy, setLcBusy]       = useState(false);
+  const [api, setApi]               = useState<Api | null>(null);
+  const [endpoints, setEndpoints]   = useState<ApiEndpoint[]>([]);
+  const [documents, setDocuments]   = useState<ApiDocument[]>([]);
+  const [versions, setVersions]     = useState<Api[]>([]);
+  const [subs, setSubs]             = useState<Subscription[]>([]);
+  const [tab, setTab]               = useState<Tab>("endpoints");
+  const [toast, setToast]           = useState<ToastState | null>(null);
+  const [lcBusy, setLcBusy]         = useState(false);
   const [statusBusy, setStatusBusy] = useState<number | null>(null);
 
   const [allowedDevs, setAllowedDevs] = useState<UserResponse[]>([]);
@@ -46,7 +43,7 @@ export default function ApiDetailPage() {
   const [addingDev,   setAddingDev]   = useState<number | null>(null);
   const [removingDev, setRemovingDev] = useState<number | null>(null);
 
-  const [rlForm, setRlForm] = useState({ perMinute: "", perHour: "", perDay: "", total: "" });
+  const [rlForm, setRlForm]     = useState({ perMinute: "", perHour: "", perDay: "", total: "" });
   const [rlSaving, setRlSaving] = useState(false);
 
   const [epModal,  setEpModal]  = useState(false);
@@ -54,12 +51,17 @@ export default function ApiDetailPage() {
   const [verModal, setVerModal] = useState(false);
 
   const [epForm, setEpForm]   = useState<CreateEndpointRequest>({ httpMethod: "GET", path: "", description: "", isAuthenticated: true });
-  const [docForm, setDocForm] = useState<CreateDocumentRequest>({ title: "", docType: "markdown", content: "", docUrl: "" });
+  const [docForm, setDocForm] = useState<CreateDocumentRequest>({ title: "", docType: "markdown", contentText: "", contentUrl: "" });
   const [newVer, setNewVer]   = useState("");
 
-  const [editModal, setEditModal] = useState(false);
-  const [editForm, setEditForm]   = useState({ apiName: "", description: "", baseUrl: "", visibility: "" });
+  const [editModal, setEditModal]   = useState(false);
+  const [editForm, setEditForm]     = useState({ apiName: "", description: "", baseUrl: "", visibility: "" });
   const [editSaving, setEditSaving] = useState(false);
+
+  const [epRlModal,  setEpRlModal]  = useState(false);
+  const [epRlTarget, setEpRlTarget] = useState<ApiEndpoint | null>(null);
+  const [epRlForm,   setEpRlForm]   = useState({ perMinute: "", perHour: "", perDay: "" });
+  const [epRlSaving, setEpRlSaving] = useState(false);
 
   const show = (message: string, type: ToastState["type"] = "success") => setToast({ message, type });
 
@@ -85,17 +87,16 @@ export default function ApiDetailPage() {
   }, [apiId]);
 
   const loadRestricted = useCallback(() => {
-  if (api?.visibility !== "restricted") return;
-  Promise.all([
-    getAllowedDevelopers(apiId),
-    apiClient.get("/api/users/org").then(r => r.data),
-  ]).then(([allowed, org]) => {
-    setAllowedDevs(allowed);
-    // show only org devs NOT already allowed
-    const allowedIds = new Set(allowed.map((d: UserResponse) => d.userId));
-    setOrgDevs(org.filter((d: UserResponse) => !allowedIds.has(d.userId)));
-  }).catch(console.error);
-}, [apiId, api?.visibility]);
+    if (api?.visibility !== "restricted") return;
+    Promise.all([
+      getAllowedDevelopers(apiId),
+      apiClient.get("/api/users/org").then(r => r.data),
+    ]).then(([allowed, org]) => {
+      setAllowedDevs(allowed);
+      const allowedIds = new Set(allowed.map((d: UserResponse) => d.userId));
+      setOrgDevs(org.filter((d: UserResponse) => !allowedIds.has(d.userId)));
+    }).catch(console.error);
+  }, [apiId, api?.visibility]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
   useEffect(() => { if (tab === "subscribers") loadSubs(); }, [tab, loadSubs]);
@@ -133,7 +134,7 @@ export default function ApiDetailPage() {
     if (!docForm.title) return show("Title is required", "error");
     try {
       await addDocument(apiId, docForm); show("Document added"); setDocModal(false);
-      setDocForm({ title: "", docType: "markdown", content: "", docUrl: "" });
+      setDocForm({ title: "", docType: "markdown", contentText: "", contentUrl: "" });
       getDocuments(apiId).then(setDocuments);
     } catch (e: any) { show(e.response?.data?.error || "Failed", "error"); }
   };
@@ -188,9 +189,9 @@ export default function ApiDetailPage() {
                 </span>
                 <StatusBadge status={api.status} />
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full
-                  ${api.visibility === "public"     ? "bg-green-50 text-green-600"   :
-                    api.visibility === "private"    ? "bg-orange-50 text-orange-500" :
-                                                      "bg-purple-50 text-purple-600"}`}>
+                  ${api.visibility === "public"  ? "bg-green-50 text-green-600"   :
+                    api.visibility === "private" ? "bg-orange-50 text-orange-500" :
+                                                   "bg-purple-50 text-purple-600"}`}>
                   {api.visibility}
                 </span>
               </div>
@@ -201,15 +202,22 @@ export default function ApiDetailPage() {
 
           <div className="flex items-center gap-2 flex-shrink-0">
             <Button variant="ghost" onClick={() => {
-              setEditForm({
-                apiName:     api.apiName,
-                description: api.description ?? "",
-                baseUrl:     api.baseUrl,
-                visibility:  api.visibility,
-              });
+              setEditForm({ apiName: api.apiName, description: api.description ?? "", baseUrl: api.baseUrl, visibility: api.visibility });
               setEditModal(true);
             }}>✏️ Edit</Button>
+
+            {api.status !== "published" && (
+              <button onClick={async () => {
+                if (!confirm("Delete this API?")) return;
+                try { await deleteApi(apiId); router.push("/provider/apis"); }
+                catch (e: any) { show(e.response?.data?.error || "Cannot delete", "error"); }
+              }} className="px-4 py-2.5 bg-red-50 text-red-500 hover:bg-red-100 text-sm font-semibold rounded-xl transition-colors">
+                🗑 Delete
+              </button>
+            )}
+
             <Button variant="ghost" onClick={() => setVerModal(true)}>+ Version</Button>
+
             {api.status === "draft" && (
               <Button variant="primary" onClick={() => lifecycle(publishApi.bind(null, apiId), "published")} disabled={lcBusy}>
                 {lcBusy ? "…" : "▶ Publish"}
@@ -260,19 +268,70 @@ export default function ApiDetailPage() {
               </div>
             ) : (
               <div className="card overflow-hidden">
+                <div className="grid grid-cols-12 gap-3 px-6 py-3 bg-gray-50 border-b border-gray-100
+                  text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  <div className="col-span-1">Method</div>
+                  <div className="col-span-3">Path</div>
+                  <div className="col-span-3">Description</div>
+                  <div className="col-span-3">Endpoint Limits</div>
+                  <div className="col-span-1">Auth</div>
+                  <div className="col-span-1 text-right">Actions</div>
+                </div>
                 <div className="divide-y divide-gray-50">
                   {endpoints.map(ep => (
-                    <div key={ep.endpointId} className="flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-colors group">
-                      <MethodBadge method={ep.httpMethod} />
-                      <code className="text-gray-700 text-sm font-mono flex-1">{ep.path}</code>
-                      <span className="text-gray-400 text-sm flex-1 truncate">{ep.description || "—"}</span>
-                      {ep.isAuthenticated && (
-                        <span className="text-xs text-orange-600 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-lg">🔒 Auth</span>
-                      )}
-                      <button onClick={() => deleteEndpoint(ep.endpointId).then(() => getEndpoints(apiId).then(setEndpoints))}
-                        className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-red-50 transition-all">
-                        Delete
-                      </button>
+                    <div key={ep.endpointId}
+                      className="grid grid-cols-12 gap-3 px-6 py-4 items-center hover:bg-gray-50 transition-colors group">
+                      <div className="col-span-1"><MethodBadge method={ep.httpMethod} /></div>
+                      <div className="col-span-3">
+                        <code className="text-gray-700 text-sm font-mono">{ep.path}</code>
+                      </div>
+                      <div className="col-span-3">
+                        <span className="text-gray-400 text-sm truncate block">{ep.description || "—"}</span>
+                      </div>
+                      <div className="col-span-3 flex flex-wrap gap-1">
+                        {ep.rateLimitPerMinute && (
+                          <span className="text-xs bg-teal-50 text-teal-600 border border-teal-100 px-2 py-0.5 rounded-lg font-mono">
+                            {ep.rateLimitPerMinute}/min
+                          </span>
+                        )}
+                        {ep.rateLimitPerHour && (
+                          <span className="text-xs bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-lg font-mono">
+                            {ep.rateLimitPerHour}/hr
+                          </span>
+                        )}
+                        {ep.rateLimitPerDay && (
+                          <span className="text-xs bg-purple-50 text-purple-600 border border-purple-100 px-2 py-0.5 rounded-lg font-mono">
+                            {ep.rateLimitPerDay}/day
+                          </span>
+                        )}
+                        {!ep.rateLimitPerMinute && !ep.rateLimitPerHour && !ep.rateLimitPerDay && (
+                          <span className="text-xs text-gray-300 italic">No limit</span>
+                        )}
+                      </div>
+                      <div className="col-span-1">
+                        {ep.isAuthenticated && (
+                          <span className="text-xs text-orange-600 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-lg">🔒</span>
+                        )}
+                      </div>
+                      <div className="col-span-1 flex justify-end items-center gap-1">
+                        <button title="Set rate limits"
+                          onClick={() => {
+                            setEpRlTarget(ep);
+                            setEpRlForm({
+                              perMinute: ep.rateLimitPerMinute?.toString() ?? "",
+                              perHour:   ep.rateLimitPerHour?.toString()   ?? "",
+                              perDay:    ep.rateLimitPerDay?.toString()     ?? "",
+                            });
+                            setEpRlModal(true);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 text-xs px-2 py-1 rounded text-teal-500 hover:bg-teal-50 transition-all">
+                          ⚡
+                        </button>
+                        <button onClick={() => deleteEndpoint(ep.endpointId).then(() => getEndpoints(apiId).then(setEndpoints))}
+                          className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-red-50 transition-all">
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -305,8 +364,8 @@ export default function ApiDetailPage() {
                       <button onClick={() => deleteDocument(doc.docId).then(() => getDocuments(apiId).then(setDocuments))}
                         className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all">✕</button>
                     </div>
-                    {doc.content && <p className="text-gray-400 text-xs line-clamp-2 mt-2">{doc.content}</p>}
-                    {doc.docUrl && <a href={doc.docUrl} target="_blank" rel="noreferrer" className="text-teal-500 text-xs mt-2 inline-block font-medium">↗ View</a>}
+                    {doc.contentText && <p className="text-gray-400 text-xs line-clamp-2 mt-2">{doc.contentText}</p>}
+                    {doc.contentUrl && <a href={doc.contentUrl} target="_blank" rel="noreferrer" className="text-teal-500 text-xs mt-2 inline-block font-medium">↗ View</a>}
                   </div>
                 ))}
               </div>
@@ -348,15 +407,10 @@ export default function ApiDetailPage() {
                 <p className="text-gray-400 text-xs mt-0.5">Developers subscribed to this API</p>
               </div>
               <div className="flex items-center gap-3 text-xs text-gray-400">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> Active
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-red-400 inline-block" /> Blocked
-                </span>
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> Active</span>
+                <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" /> Blocked</span>
               </div>
             </div>
-
             {subs.length === 0 ? (
               <div className="card p-20 text-center border-2 border-dashed border-gray-200">
                 <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -370,7 +424,6 @@ export default function ApiDetailPage() {
               </div>
             ) : (
               <div className="card overflow-hidden">
-                {/* Table header */}
                 <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   <div className="col-span-3">Developer</div>
                   <div className="col-span-2">App</div>
@@ -378,77 +431,42 @@ export default function ApiDetailPage() {
                   <div className="col-span-2">Status</div>
                   <div className="col-span-3 text-right">Actions</div>
                 </div>
-
                 <div className="divide-y divide-gray-50">
                   {subs.map(sub => (
-                    <div key={sub.subscriptionId}
-                      className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-gray-50 transition-colors">
-
-                      {/* Developer */}
+                    <div key={sub.subscriptionId} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-gray-50 transition-colors">
                       <div className="col-span-3 flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-cyan-400
-                          flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-cyan-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                           {sub.appName?.[0]?.toUpperCase() ?? "D"}
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-700">{sub.appName}</p>
-                        </div>
+                        <p className="text-sm font-semibold text-gray-700">{sub.appName}</p>
                       </div>
-
-                      {/* App */}
                       <div className="col-span-2">
-                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">
-                          {sub.appName}
-                        </span>
+                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-lg">{sub.appName}</span>
                       </div>
-
-                      {/* Date */}
                       <div className="col-span-2">
                         <span className="text-xs text-gray-400">
-                          {sub.subscribedAt
-                            ? new Date(sub.subscribedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
-                            : "—"}
+                          {sub.subscribedAt ? new Date(sub.subscribedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
                         </span>
                       </div>
-
-                      {/* Status */}
                       <div className="col-span-2">
                         <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full
-                          ${sub.status === "active"    ? "bg-green-50 text-green-600"  :
-                            sub.status === "blocked"   ? "bg-red-50 text-red-500"     :
-                            sub.status === "cancelled" ? "bg-gray-100 text-gray-400"  :
-                                                         "bg-amber-50 text-amber-600"}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full inline-block
-                            ${sub.status === "active"  ? "bg-green-400" :
-                              sub.status === "blocked" ? "bg-red-400"   : "bg-gray-300"}`} />
+                          ${sub.status === "active" ? "bg-green-50 text-green-600" : sub.status === "blocked" ? "bg-red-50 text-red-500" : sub.status === "cancelled" ? "bg-gray-100 text-gray-400" : "bg-amber-50 text-amber-600"}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full inline-block ${sub.status === "active" ? "bg-green-400" : sub.status === "blocked" ? "bg-red-400" : "bg-gray-300"}`} />
                           {sub.status}
                         </span>
                       </div>
-
-                      {/* Actions */}
                       <div className="col-span-3 flex justify-end gap-2">
                         {sub.status !== "cancelled" && (
-                          <button
-                            onClick={() => handleStatusToggle(sub.subscriptionId, sub.status)}
-                            disabled={statusBusy === sub.subscriptionId}
-                            className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all disabled:opacity-50
-                              ${sub.status === "active"
-                                ? "bg-red-50 text-red-500 hover:bg-red-100"
-                                : "bg-green-50 text-green-600 hover:bg-green-100"}`}>
-                            {statusBusy === sub.subscriptionId
-                              ? "…"
-                              : sub.status === "active" ? "Block" : "Reactivate"}
+                          <button onClick={() => handleStatusToggle(sub.subscriptionId, sub.status)} disabled={statusBusy === sub.subscriptionId}
+                            className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all disabled:opacity-50 ${sub.status === "active" ? "bg-red-50 text-red-500 hover:bg-red-100" : "bg-green-50 text-green-600 hover:bg-green-100"}`}>
+                            {statusBusy === sub.subscriptionId ? "…" : sub.status === "active" ? "Block" : "Reactivate"}
                           </button>
                         )}
-                        {sub.status === "cancelled" && (
-                          <span className="text-xs text-gray-300 italic">Cancelled by developer</span>
-                        )}
+                        {sub.status === "cancelled" && <span className="text-xs text-gray-300 italic">Cancelled by developer</span>}
                       </div>
                     </div>
                   ))}
                 </div>
-
-                {/* Footer summary */}
                 <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex items-center gap-4 text-xs text-gray-400">
                   <span>{subs.filter(s => s.status === "active").length} active</span>
                   <span>{subs.filter(s => s.status === "blocked").length} blocked</span>
@@ -461,54 +479,57 @@ export default function ApiDetailPage() {
 
         {/* ── Rate Limits ─────────────────────────────────────────────────── */}
         {tab === "ratelimits" && (
-          <div className="animate-fade-in max-w-lg">
-            <h2 className="font-bold text-gray-800 mb-5">Rate Limits</h2>
+          <div className="animate-fade-in">
+            <h2 className="font-bold text-gray-800 mb-2">Rate Limits</h2>
+            <p className="text-gray-400 text-xs mb-6">
+              Set global limits for the entire API, or fine-tune limits per endpoint.
+              Endpoint limits are checked first — global limits apply as an overall cap.
+            </p>
 
-            {/* Current limits display */}
-            {(api.rateLimitPerMinute || api.rateLimitPerHour || api.rateLimitPerDay || api.rateLimitTotal) && (
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                {[
-                  { label: "Per Minute", value: api.rateLimitPerMinute, icon: "⚡" },
-                  { label: "Per Hour",   value: api.rateLimitPerHour,   icon: "🕐" },
-                  { label: "Per Day",    value: api.rateLimitPerDay,    icon: "📅" },
-                  { label: "Total",      value: api.rateLimitTotal,     icon: "∞"  },
-                ].filter(x => x.value).map(x => (
-                  <div key={x.label} className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-100 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-base">{x.icon}</span>
-                      <span className="text-xs font-semibold text-teal-600">{x.label}</span>
+            {/* ── Global Limits ── */}
+            <div className="card p-6 mb-5">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-base">🌐</span>
+                <p className="text-sm font-bold text-gray-700">Global API Limits</p>
+                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">
+                  Applies to all endpoints combined
+                </span>
+              </div>
+
+              {(api.rateLimitPerMinute || api.rateLimitPerHour || api.rateLimitPerDay || api.rateLimitTotal) ? (
+                <div className="grid grid-cols-4 gap-3 mb-5">
+                  {[
+                    { label: "Per Minute", value: api.rateLimitPerMinute, icon: "⚡" },
+                    { label: "Per Hour",   value: api.rateLimitPerHour,   icon: "🕐" },
+                    { label: "Per Day",    value: api.rateLimitPerDay,    icon: "📅" },
+                    { label: "Total",      value: api.rateLimitTotal,     icon: "∞"  },
+                  ].filter(x => x.value).map(x => (
+                    <div key={x.label} className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-100 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm">{x.icon}</span>
+                        <span className="text-xs font-semibold text-teal-600">{x.label}</span>
+                      </div>
+                      <p className="text-2xl font-extrabold text-gray-800">{x.value?.toLocaleString()}</p>
+                      <p className="text-xs text-gray-400">calls allowed</p>
                     </div>
-                    <p className="text-2xl font-extrabold text-gray-800">{x.value?.toLocaleString()}</p>
-                    <p className="text-xs text-gray-400">calls allowed</p>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-green-50 border border-green-100 rounded-xl p-3 mb-5 text-sm text-green-600 font-semibold">
+                  ✅ No global limits — unlimited access
+                </div>
+              )}
 
-            {!api.rateLimitPerMinute && !api.rateLimitPerHour && !api.rateLimitPerDay && !api.rateLimitTotal && (
-              <div className="bg-green-50 border border-green-100 rounded-xl p-4 mb-6 text-sm text-green-600 font-semibold">
-                ✅ No rate limits set — developers have unlimited access
-              </div>
-            )}
-
-            <div className="card p-6">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
-                Update Rate Limits
-              </p>
-              <p className="text-xs text-gray-400 mb-5">Leave blank to disable a limit.</p>
+              <p className="text-xs text-gray-400 mb-4">Leave blank to remove a limit.</p>
               <div className="grid grid-cols-2 gap-4">
                 <Input label="Per Minute" placeholder="e.g. 60" type="number"
-                  value={rlForm.perMinute}
-                  onChange={e => setRlForm(p => ({ ...p, perMinute: e.target.value }))} />
+                  value={rlForm.perMinute} onChange={e => setRlForm(p => ({ ...p, perMinute: e.target.value }))} />
                 <Input label="Per Hour" placeholder="e.g. 1000" type="number"
-                  value={rlForm.perHour}
-                  onChange={e => setRlForm(p => ({ ...p, perHour: e.target.value }))} />
+                  value={rlForm.perHour} onChange={e => setRlForm(p => ({ ...p, perHour: e.target.value }))} />
                 <Input label="Per Day" placeholder="e.g. 10000" type="number"
-                  value={rlForm.perDay}
-                  onChange={e => setRlForm(p => ({ ...p, perDay: e.target.value }))} />
+                  value={rlForm.perDay} onChange={e => setRlForm(p => ({ ...p, perDay: e.target.value }))} />
                 <Input label="Total (lifetime)" placeholder="e.g. 100000" type="number"
-                  value={rlForm.total}
-                  onChange={e => setRlForm(p => ({ ...p, total: e.target.value }))} />
+                  value={rlForm.total} onChange={e => setRlForm(p => ({ ...p, total: e.target.value }))} />
               </div>
               <Button variant="primary" disabled={rlSaving} className="w-full mt-4"
                 onClick={async () => {
@@ -520,132 +541,188 @@ export default function ApiDetailPage() {
                       rateLimitPerDay:    rlForm.perDay     ? Number(rlForm.perDay)    : null,
                       rateLimitTotal:     rlForm.total      ? Number(rlForm.total)     : null,
                     });
-                    show("Rate limits saved");
+                    show("Global rate limits saved");
                     loadAll();
                   } catch (e: any) {
                     show(e.response?.data?.error || "Failed", "error");
                   } finally { setRlSaving(false); }
                 }}>
-                {rlSaving ? "Saving…" : "Save Rate Limits"}
+                {rlSaving ? "Saving…" : "Save Global Limits"}
               </Button>
             </div>
+
+            {/* ── Per Endpoint Limits ── */}
+            <div className="card overflow-hidden">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">⚡</span>
+                  <p className="text-sm font-bold text-gray-700">Per Endpoint Limits</p>
+                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">
+                    Override limits for specific endpoints
+                  </span>
+                </div>
+              </div>
+
+              {endpoints.length === 0 ? (
+                <div className="p-10 text-center">
+                  <p className="text-gray-400 text-sm">No endpoints yet.</p>
+                  <button onClick={() => setTab("endpoints")} className="text-teal-500 text-xs font-semibold mt-1">
+                    Add endpoints first →
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-12 gap-3 px-6 py-2.5 bg-gray-50
+                    text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    <div className="col-span-1">Method</div>
+                    <div className="col-span-3">Path</div>
+                    <div className="col-span-2 text-center">Per Minute</div>
+                    <div className="col-span-2 text-center">Per Hour</div>
+                    <div className="col-span-2 text-center">Per Day</div>
+                    <div className="col-span-2 text-right">Action</div>
+                  </div>
+                  <div className="divide-y divide-gray-50">
+                    {endpoints.map(ep => (
+                      <div key={ep.endpointId} className="grid grid-cols-12 gap-3 px-6 py-3.5 items-center hover:bg-gray-50">
+                        <div className="col-span-1"><MethodBadge method={ep.httpMethod} /></div>
+                        <div className="col-span-3">
+                          <code className="text-xs font-mono text-gray-700">{ep.path}</code>
+                        </div>
+                        <div className="col-span-2 text-center">
+                          {ep.rateLimitPerMinute
+                            ? <span className="text-xs bg-teal-50 text-teal-600 border border-teal-100 px-2.5 py-1 rounded-lg font-mono font-bold">{ep.rateLimitPerMinute}</span>
+                            : <span className="text-xs text-gray-300">∞ unlimited</span>}
+                        </div>
+                        <div className="col-span-2 text-center">
+                          {ep.rateLimitPerHour
+                            ? <span className="text-xs bg-blue-50 text-blue-600 border border-blue-100 px-2.5 py-1 rounded-lg font-mono font-bold">{ep.rateLimitPerHour}</span>
+                            : <span className="text-xs text-gray-300">∞ unlimited</span>}
+                        </div>
+                        <div className="col-span-2 text-center">
+                          {ep.rateLimitPerDay
+                            ? <span className="text-xs bg-purple-50 text-purple-600 border border-purple-100 px-2.5 py-1 rounded-lg font-mono font-bold">{ep.rateLimitPerDay}</span>
+                            : <span className="text-xs text-gray-300">∞ unlimited</span>}
+                        </div>
+                        <div className="col-span-2 flex justify-end">
+                          <button
+                            onClick={() => {
+                              setEpRlTarget(ep);
+                              setEpRlForm({
+                                perMinute: ep.rateLimitPerMinute?.toString() ?? "",
+                                perHour:   ep.rateLimitPerHour?.toString()   ?? "",
+                                perDay:    ep.rateLimitPerDay?.toString()     ?? "",
+                              });
+                              setEpRlModal(true);
+                            }}
+                            className="text-xs font-semibold px-3 py-1.5 rounded-lg
+                              bg-gray-50 hover:bg-teal-50 text-gray-500 hover:text-teal-600
+                              border border-gray-200 hover:border-teal-200 transition-all">
+                            ✏️ Set Limit
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-6 py-3 bg-gray-50 border-t border-gray-100">
+                    <p className="text-xs text-gray-400">
+                      💡 Endpoint limits override global limits for that specific route. Leave unlimited to fall back to global limits.
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
 
-
+        {/* ── Access Control ──────────────────────────────────────────────── */}
         {tab === "restricted" && (
-  <div className="animate-fade-in">
-    <div className="flex items-center justify-between mb-5">
-      <div>
-        <h2 className="font-bold text-gray-800">Access Control</h2>
-        <p className="text-gray-400 text-xs mt-0.5">
-          This API is restricted — only allowed developers can see and subscribe to it
-        </p>
-      </div>
-      <span className="bg-purple-50 text-purple-600 text-xs font-semibold px-3 py-1.5 rounded-xl border border-purple-100">
-        🔒 Restricted Visibility
-      </span>
-    </div>
- 
-    <div className="grid grid-cols-2 gap-5">
- 
-      {/* Allowed developers */}
-      <div>
-        <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-          <span className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-xs">✓</span>
-          Has Access ({allowedDevs.length})
-        </h3>
- 
-        {allowedDevs.length === 0 ? (
-          <div className="card p-8 text-center border-2 border-dashed border-gray-200">
-            <p className="text-gray-400 text-sm">No developers have access yet</p>
-            <p className="text-gray-300 text-xs mt-1">Add developers from the right panel</p>
-          </div>
-        ) : (
-          <div className="card overflow-hidden">
-            <div className="divide-y divide-gray-50">
-              {allowedDevs.map(dev => (
-                <div key={dev.userId} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 group">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-teal-400
-                    flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                    {dev.name?.[0]?.toUpperCase()}
+          <div className="animate-fade-in">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="font-bold text-gray-800">Access Control</h2>
+                <p className="text-gray-400 text-xs mt-0.5">This API is restricted — only allowed developers can see and subscribe to it</p>
+              </div>
+              <span className="bg-purple-50 text-purple-600 text-xs font-semibold px-3 py-1.5 rounded-xl border border-purple-100">
+                🔒 Restricted Visibility
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-5">
+              <div>
+                <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                  <span className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-xs">✓</span>
+                  Has Access ({allowedDevs.length})
+                </h3>
+                {allowedDevs.length === 0 ? (
+                  <div className="card p-8 text-center border-2 border-dashed border-gray-200">
+                    <p className="text-gray-400 text-sm">No developers have access yet</p>
+                    <p className="text-gray-300 text-xs mt-1">Add developers from the right panel</p>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-700 truncate">{dev.name}</p>
-                    <p className="text-xs text-gray-400 truncate">{dev.email}</p>
+                ) : (
+                  <div className="card overflow-hidden">
+                    <div className="divide-y divide-gray-50">
+                      {allowedDevs.map(dev => (
+                        <div key={dev.userId} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 group">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-teal-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                            {dev.name?.[0]?.toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-700 truncate">{dev.name}</p>
+                            <p className="text-xs text-gray-400 truncate">{dev.email}</p>
+                          </div>
+                          <button onClick={async () => {
+                            setRemovingDev(dev.userId);
+                            try { await removeAllowedDeveloper(apiId, dev.userId); show("Access revoked"); loadRestricted(); }
+                            catch (e: any) { show(e.response?.data?.error || "Failed", "error"); }
+                            finally { setRemovingDev(null); }
+                          }} disabled={removingDev === dev.userId}
+                            className="opacity-0 group-hover:opacity-100 text-xs font-semibold px-2.5 py-1.5 bg-red-50 text-red-500 hover:bg-red-100 rounded-lg transition-all disabled:opacity-50">
+                            {removingDev === dev.userId ? "…" : "Revoke"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <button
-                    onClick={async () => {
-                      setRemovingDev(dev.userId);
-                      try {
-                        await removeAllowedDeveloper(apiId, dev.userId);
-                        show("Access revoked");
-                        loadRestricted();
-                      } catch (e: any) {
-                        show(e.response?.data?.error || "Failed", "error");
-                      } finally { setRemovingDev(null); }
-                    }}
-                    disabled={removingDev === dev.userId}
-                    className="opacity-0 group-hover:opacity-100 text-xs font-semibold px-2.5 py-1.5
-                      bg-red-50 text-red-500 hover:bg-red-100 rounded-lg transition-all disabled:opacity-50">
-                    {removingDev === dev.userId ? "…" : "Revoke"}
-                  </button>
-                </div>
-              ))}
+                )}
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+                  <span className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-xs">+</span>
+                  Add Access ({orgDevs.length} available)
+                </h3>
+                {orgDevs.length === 0 ? (
+                  <div className="card p-8 text-center border-2 border-dashed border-gray-200">
+                    <p className="text-gray-400 text-sm">All org developers have access</p>
+                  </div>
+                ) : (
+                  <div className="card overflow-hidden">
+                    <div className="divide-y divide-gray-50">
+                      {orgDevs.map(dev => (
+                        <div key={dev.userId} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 group">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-cyan-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                            {dev.name?.[0]?.toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-700 truncate">{dev.name}</p>
+                            <p className="text-xs text-gray-400 truncate">{dev.email}</p>
+                          </div>
+                          <button onClick={async () => {
+                            setAddingDev(dev.userId);
+                            try { await addAllowedDeveloper(apiId, dev.userId); show(`Access granted to ${dev.name}`); loadRestricted(); }
+                            catch (e: any) { show(e.response?.data?.error || "Failed", "error"); }
+                            finally { setAddingDev(null); }
+                          }} disabled={addingDev === dev.userId}
+                            className="opacity-0 group-hover:opacity-100 text-xs font-semibold px-2.5 py-1.5 bg-teal-50 text-teal-600 hover:bg-teal-100 rounded-lg transition-all disabled:opacity-50">
+                            {addingDev === dev.userId ? "…" : "Grant"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
-      </div>
- 
-      {/* Org developers without access */}
-      <div>
-        <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-          <span className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-xs">+</span>
-          Add Access ({orgDevs.length} available)
-        </h3>
- 
-        {orgDevs.length === 0 ? (
-          <div className="card p-8 text-center border-2 border-dashed border-gray-200">
-            <p className="text-gray-400 text-sm">All org developers have access</p>
-          </div>
-        ) : (
-          <div className="card overflow-hidden">
-            <div className="divide-y divide-gray-50">
-              {orgDevs.map(dev => (
-                <div key={dev.userId} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 group">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-cyan-400
-                    flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                    {dev.name?.[0]?.toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-700 truncate">{dev.name}</p>
-                    <p className="text-xs text-gray-400 truncate">{dev.email}</p>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      setAddingDev(dev.userId);
-                      try {
-                        await addAllowedDeveloper(apiId, dev.userId);
-                        show(`Access granted to ${dev.name}`);
-                        loadRestricted();
-                      } catch (e: any) {
-                        show(e.response?.data?.error || "Failed", "error");
-                      } finally { setAddingDev(null); }
-                    }}
-                    disabled={addingDev === dev.userId}
-                    className="opacity-0 group-hover:opacity-100 text-xs font-semibold px-2.5 py-1.5
-                      bg-teal-50 text-teal-600 hover:bg-teal-100 rounded-lg transition-all disabled:opacity-50">
-                    {addingDev === dev.userId ? "…" : "Grant"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-)}
       </div>
 
       {/* ── Modals ─────────────────────────────────────────────────────────── */}
@@ -687,10 +764,10 @@ export default function ApiDetailPage() {
               onChange={e => setDocForm(p => ({ ...p, docType: e.target.value }))}>
               {["markdown", "howto", "samples", "publicforum", "support"].map(t => <option key={t}>{t}</option>)}
             </Select>
-            <Textarea label="Content" rows={5} value={docForm.content}
-              onChange={e => setDocForm(p => ({ ...p, content: e.target.value }))} />
-            <Input label="External URL" placeholder="https://docs.example.com" value={docForm.docUrl}
-              onChange={e => setDocForm(p => ({ ...p, docUrl: e.target.value }))} />
+            <Textarea label="Content" rows={5} value={docForm.contentText}
+              onChange={e => setDocForm(p => ({ ...p, contentText: e.target.value }))} />
+            <Input label="External URL" placeholder="https://docs.example.com" value={docForm.contentUrl}
+              onChange={e => setDocForm(p => ({ ...p, contentUrl: e.target.value }))} />
             <Button variant="primary" onClick={submitDoc} className="w-full">Add Document</Button>
           </div>
         </Modal>
@@ -744,20 +821,54 @@ export default function ApiDetailPage() {
         </Modal>
       )}
 
-
-      {api.status !== "published" && (
-        <button onClick={async () => {
-          if (!confirm("Delete this API?")) return;
-          try {
-            await deleteApi(apiId);
-            router.push("/provider/apis");
-          } catch (e: any) {
-            show(e.response?.data?.error || "Cannot delete", "error");
-          }
-        }}
-          className="px-4 py-2.5 bg-red-50 text-red-500 hover:bg-red-100 text-sm font-semibold rounded-xl transition-colors">
-          🗑 Delete
-        </button>
+      {epRlModal && epRlTarget && (
+        <Modal title="Endpoint Rate Limits" onClose={() => setEpRlModal(false)}>
+          <div className="flex flex-col gap-4">
+            <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
+              <MethodBadge method={epRlTarget.httpMethod} />
+              <code className="text-sm font-mono text-gray-700">{epRlTarget.path}</code>
+            </div>
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
+              💡 Endpoint limits are checked <strong>before</strong> API level limits.
+              Leave blank to remove the limit for this endpoint.
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <Input label="Per Minute" placeholder="e.g. 30" type="number"
+                value={epRlForm.perMinute}
+                onChange={e => setEpRlForm(p => ({ ...p, perMinute: e.target.value }))} />
+              <Input label="Per Hour" placeholder="e.g. 500" type="number"
+                value={epRlForm.perHour}
+                onChange={e => setEpRlForm(p => ({ ...p, perHour: e.target.value }))} />
+              <Input label="Per Day" placeholder="e.g. 5000" type="number"
+                value={epRlForm.perDay}
+                onChange={e => setEpRlForm(p => ({ ...p, perDay: e.target.value }))} />
+            </div>
+            {(epRlTarget.rateLimitPerMinute || epRlTarget.rateLimitPerHour || epRlTarget.rateLimitPerDay) && (
+              <button onClick={() => setEpRlForm({ perMinute: "", perHour: "", perDay: "" })}
+                className="text-xs text-red-400 hover:text-red-600 font-semibold text-left">
+                ✕ Clear all limits for this endpoint
+              </button>
+            )}
+            <Button variant="primary" disabled={epRlSaving} className="w-full"
+              onClick={async () => {
+                setEpRlSaving(true);
+                try {
+                  await updateEndpoint(epRlTarget.endpointId, {
+                    rateLimitPerMinute: epRlForm.perMinute ? Number(epRlForm.perMinute) : -1,
+                    rateLimitPerHour:   epRlForm.perHour   ? Number(epRlForm.perHour)   : -1,
+                    rateLimitPerDay:    epRlForm.perDay     ? Number(epRlForm.perDay)    : -1,
+                  });
+                  show("Endpoint rate limits saved");
+                  setEpRlModal(false);
+                  getEndpoints(apiId).then(setEndpoints);
+                } catch (e: any) {
+                  show(e.response?.data?.error || "Failed", "error");
+                } finally { setEpRlSaving(false); }
+              }}>
+              {epRlSaving ? "Saving…" : "Save Limits"}
+            </Button>
+          </div>
+        </Modal>
       )}
 
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}

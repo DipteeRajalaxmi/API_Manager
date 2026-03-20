@@ -4,6 +4,7 @@ import com.apimanager.identity.entity.User;
 import com.apimanager.registry.entity.Api;
 import jakarta.persistence.*;
 import lombok.*;
+import com.apimanager.registry.entity.ApiEndpoint;
  
 import java.time.LocalDateTime;
  
@@ -67,6 +68,10 @@ public class ApiUsageLog {
     // which limit was hit: PER_MINUTE | PER_HOUR | PER_DAY | TOTAL | null
     @Column(name = "rate_limit_type")
     private String rateLimitType;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "endpoint_id")
+    private ApiEndpoint endpoint;
 
    
 }

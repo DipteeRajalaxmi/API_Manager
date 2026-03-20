@@ -79,7 +79,7 @@ export const getNavItems = (role: string) => {
         { href: "/provider/dashboard", icon: "dashboard", label: "Dashboard"   },
         { href: "/provider/apis",      icon: "apis",      label: "My APIs"     },
         { href: "/marketplace",        icon: "market",    label: "Marketplace" },
-        { href: "/provider/api-requests", icon: "analytics", label: "API Requests" },
+        { href: "/provider/api-requests", icon: "handshake", label: "API Requests" },
         { href: "/provider/developers", icon: "users", label: "Developers" },
         { href: "/provider/analytics", icon: "analytics", label: "Analytics" },
         { href: "/provider/settings", icon: "settings", label: "Settings" }
@@ -91,7 +91,7 @@ export const getNavItems = (role: string) => {
         { href: "/marketplace",         icon: "market",    label: "Marketplace" },
         { href: "/developer/apps",      icon: "apps",      label: "My Apps"     },
         { href: "/developer/contribute",  icon: "apis",      label: "Contribute API" },
-{ href: "/developer/my-requests", icon: "analytics", label: "My Requests"    },
+        { href: "/developer/my-requests", icon: "handshake ", label: "My Requests"    },
         { href: "/developer/analytics", icon: "analytics", label: "Analytics" },
         { href: "/developer/settings", icon: "settings", label: "Settings" }
       ];

@@ -120,16 +120,24 @@ public class GatewayController {
     }
 
     private void addRateLimitHeaders(org.springframework.http.HttpHeaders h,
-                                      RateLimitHeaders rl) {
+                                    RateLimitHeaders rl) {
         if (rl == null) return;
-        if (rl.limitMinute     != null) h.set("X-RateLimit-Limit-Minute",      String.valueOf(rl.limitMinute));
-        if (rl.remainingMinute != null) h.set("X-RateLimit-Remaining-Minute",  String.valueOf(rl.remainingMinute));
-        if (rl.limitHour       != null) h.set("X-RateLimit-Limit-Hour",        String.valueOf(rl.limitHour));
-        if (rl.remainingHour   != null) h.set("X-RateLimit-Remaining-Hour",    String.valueOf(rl.remainingHour));
-        if (rl.limitDay        != null) h.set("X-RateLimit-Limit-Day",         String.valueOf(rl.limitDay));
-        if (rl.remainingDay    != null) h.set("X-RateLimit-Remaining-Day",     String.valueOf(rl.remainingDay));
-        if (rl.limitTotal      != null) h.set("X-RateLimit-Limit-Total",       String.valueOf(rl.limitTotal));
-        if (rl.remainingTotal  != null) h.set("X-RateLimit-Remaining-Total",   String.valueOf(rl.remainingTotal));
+        // API level
+        if (rl.limitMinute     != null) h.set("X-RateLimit-Limit-Minute",              String.valueOf(rl.limitMinute));
+        if (rl.remainingMinute != null) h.set("X-RateLimit-Remaining-Minute",          String.valueOf(rl.remainingMinute));
+        if (rl.limitHour       != null) h.set("X-RateLimit-Limit-Hour",                String.valueOf(rl.limitHour));
+        if (rl.remainingHour   != null) h.set("X-RateLimit-Remaining-Hour",            String.valueOf(rl.remainingHour));
+        if (rl.limitDay        != null) h.set("X-RateLimit-Limit-Day",                 String.valueOf(rl.limitDay));
+        if (rl.remainingDay    != null) h.set("X-RateLimit-Remaining-Day",             String.valueOf(rl.remainingDay));
+        if (rl.limitTotal      != null) h.set("X-RateLimit-Limit-Total",               String.valueOf(rl.limitTotal));
+        if (rl.remainingTotal  != null) h.set("X-RateLimit-Remaining-Total",           String.valueOf(rl.remainingTotal));
+        // Endpoint level
+        if (rl.endpointLimitMinute     != null) h.set("X-RateLimit-Endpoint-Limit-Minute",     String.valueOf(rl.endpointLimitMinute));
+        if (rl.endpointRemainingMinute != null) h.set("X-RateLimit-Endpoint-Remaining-Minute", String.valueOf(rl.endpointRemainingMinute));
+        if (rl.endpointLimitHour       != null) h.set("X-RateLimit-Endpoint-Limit-Hour",       String.valueOf(rl.endpointLimitHour));
+        if (rl.endpointRemainingHour   != null) h.set("X-RateLimit-Endpoint-Remaining-Hour",   String.valueOf(rl.endpointRemainingHour));
+        if (rl.endpointLimitDay        != null) h.set("X-RateLimit-Endpoint-Limit-Day",        String.valueOf(rl.endpointLimitDay));
+        if (rl.endpointRemainingDay    != null) h.set("X-RateLimit-Endpoint-Remaining-Day",    String.valueOf(rl.endpointRemainingDay));
     }
 
     private String extractClientIp(HttpServletRequest request) {

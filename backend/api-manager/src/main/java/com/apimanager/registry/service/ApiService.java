@@ -172,6 +172,9 @@ public class ApiService {
                 .requestSchema(request.getRequestSchema())
                 .responseSchema(request.getResponseSchema())
                 .isAuthenticated(request.getIsAuthenticated() != null ? request.getIsAuthenticated() : true)
+                .rateLimitPerMinute(request.getRateLimitPerMinute())
+                .rateLimitPerHour(request.getRateLimitPerHour())
+                .rateLimitPerDay(request.getRateLimitPerDay())
                 .build();
 
         return mapEndpointToResponse(apiEndpointRepository.save(endpoint));
@@ -331,6 +334,13 @@ public class ApiService {
         if (request.getRequestSchema() != null) endpoint.setRequestSchema(request.getRequestSchema());
         if (request.getResponseSchema() != null) endpoint.setResponseSchema(request.getResponseSchema());
         if (request.getIsAuthenticated() != null) endpoint.setIsAuthenticated(request.getIsAuthenticated());
+        if (request.getRateLimitPerMinute() != null) endpoint.setRateLimitPerMinute(request.getRateLimitPerMinute());
+        if (request.getRateLimitPerHour()   != null) endpoint.setRateLimitPerHour(request.getRateLimitPerHour());
+        if (request.getRateLimitPerDay()    != null) endpoint.setRateLimitPerDay(request.getRateLimitPerDay());
+        // To CLEAR a rate limit pass -1 from frontend:
+        if (request.getRateLimitPerMinute() != null && request.getRateLimitPerMinute() == -1) endpoint.setRateLimitPerMinute(null);
+        if (request.getRateLimitPerHour()   != null && request.getRateLimitPerHour()   == -1) endpoint.setRateLimitPerHour(null);
+        if (request.getRateLimitPerDay()    != null && request.getRateLimitPerDay()    == -1) endpoint.setRateLimitPerDay(null);
 
         return mapEndpointToResponse(apiEndpointRepository.save(endpoint));
     }
@@ -414,6 +424,9 @@ public class ApiService {
                 .requestSchema(endpoint.getRequestSchema())
                 .responseSchema(endpoint.getResponseSchema())
                 .isAuthenticated(endpoint.getIsAuthenticated())
+                .rateLimitPerMinute(endpoint.getRateLimitPerMinute())
+                .rateLimitPerHour(endpoint.getRateLimitPerHour())
+                .rateLimitPerDay(endpoint.getRateLimitPerDay())
                 .build();
     }
 

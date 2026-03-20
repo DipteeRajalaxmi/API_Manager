@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import java.util.Map;
 
 import java.util.List;
 
@@ -44,6 +45,13 @@ public class UserController {
     @GetMapping("/org")
     public ResponseEntity<List<UserResponse>> getOrgDevelopers(Authentication authentication) {
         return ResponseEntity.ok(userService.getOrgDevelopers(authentication.getName()));
+    }
+
+    @PostMapping("/org/add")
+    public ResponseEntity<?> addDeveloperToOrg(
+            @RequestBody Map<String, String> body,
+            Authentication auth) {
+        return ResponseEntity.ok(userService.addDeveloperToOrg(body.get("name"), body.get("email"), body.get("password"), auth.getName()));
     }
     
     

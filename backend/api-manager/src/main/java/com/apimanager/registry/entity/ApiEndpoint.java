@@ -52,4 +52,13 @@ public class ApiEndpoint {
 
     @Column(name = "auth_override", length = 30)
     private String authOverride;
+
+    @Column(name = "rate_limit_per_minute")
+    private Long rateLimitPerMinute;
+    
+    @Column(name = "rate_limit_per_hour")
+    private Long rateLimitPerHour;
+    
+    @Column(name = "rate_limit_per_day")
+    private Long rateLimitPerDay;
 }

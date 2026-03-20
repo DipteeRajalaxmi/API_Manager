@@ -3,18 +3,44 @@ import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from "@/lib/api";
 import { UserResponse } from "@/types/auth";
+import { getOrgDevelopers, addDeveloperToOrg } from "@/lib/users";
+
 
 export default function DevelopersPage() {
   const [developers, setDevelopers] = useState<UserResponse[]>([]);
   const [loading, setLoading]       = useState(true);
   const [search, setSearch]         = useState("");
+  const [addModal, setAddModal]     = useState(false);
+  const [addForm, setAddForm] = useState({ name: "", email: "", password: "" });
+  const [addLoading, setAddLoading] = useState(false);
+  const [addError, setAddError]     = useState("");
 
-  useEffect(() => {
-    api.get("/api/users/org")
-      .then(r => setDevelopers(r.data))
+  const loadDevelopers = () => {
+    setLoading(true);
+    getOrgDevelopers()
+      .then(setDevelopers)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  };
+  useEffect(() => { loadDevelopers(); }, []);
+
+  const handleAddDeveloper = async () => {
+  if (!addForm.name || !addForm.email || !addForm.password) {
+    setAddError("All fields are required"); return;
+  }
+  if (addForm.password.length < 8) {
+    setAddError("Password must be at least 8 characters"); return;
+  }
+  setAddLoading(true); setAddError("");
+  try {
+    await addDeveloperToOrg(addForm.name, addForm.email, addForm.password);
+    setAddModal(false);
+    setAddForm({ name: "", email: "" ,password:""});
+    loadDevelopers();
+  } catch (e: any) {
+    setAddError(e.response?.data?.error || "Failed to add developer");
+  } finally { setAddLoading(false); }
+};
 
   const filtered = developers.filter(d =>
     d.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -62,11 +88,19 @@ export default function DevelopersPage() {
               Share your invite code from Settings → developers register with it to join your org
             </p>
           </div>
-          <a href="/provider/settings"
-            className="flex-shrink-0 bg-teal-500 hover:bg-teal-600 text-white text-xs font-semibold
-              px-4 py-2 rounded-xl transition-all">
-            View Invite Code →
-          </a>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <button
+              onClick={() => setAddModal(true)}
+              className="bg-teal-500 hover:bg-teal-600 text-white text-xs font-semibold
+                px-4 py-2 rounded-xl transition-all">
+              + Add Developer
+            </button>
+            <a href="/provider/settings"
+              className="bg-white border border-teal-200 text-teal-600 text-xs font-semibold
+                px-4 py-2 rounded-xl transition-all hover:bg-teal-50">
+              View Invite Code →
+            </a>
+          </div>
         </div>
 
         {/* Search */}
@@ -168,9 +202,9 @@ export default function DevelopersPage() {
 
                   {/* Last login */}
                   <div className="col-span-1 text-right">
-                    <p className="text-xs text-gray-300">
+                    <p className="text-xs text-gray-400">
                       {dev.lastLoginAt
-                        ? new Date(dev.lastLoginAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+                        ? new Date(dev.lastLoginAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: true })
                         : "Never"}
                     </p>
                   </div>
@@ -186,6 +220,72 @@ export default function DevelopersPage() {
           </div>
         )}
       </div>
+
+      {addModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-extrabold text-gray-800">Add Developer</h2>
+              <button onClick={() => { setAddModal(false); setAddError(""); }}
+                className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
+                  Full Name *
+                </label>
+                <input
+                  value={addForm.name}
+                  onChange={e => setAddForm(p => ({ ...p, name: e.target.value }))}
+                  placeholder="John Doe"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
+                    focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
+                  Email *
+                </label>
+                <input
+                  value={addForm.email}
+                  onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))}
+                  placeholder="john@example.com"
+                  type="email"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
+                    focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1.5">
+                  Password *
+                </label>
+                <input
+                  value={addForm.password}
+                  onChange={e => setAddForm(p => ({ ...p, password: e.target.value }))}
+                  placeholder="Min 8 characters"
+                  type="password"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm
+                    focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
+                />
+              </div>
+
+              {addError && (
+                <p className="text-xs text-red-500 font-semibold">{addError}</p>
+              )}
+
+              <button
+                onClick={handleAddDeveloper}
+                disabled={addLoading}
+                className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-50
+                  text-white font-semibold py-2.5 rounded-xl text-sm transition-all">
+                {addLoading ? "Adding…" : "Add Developer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

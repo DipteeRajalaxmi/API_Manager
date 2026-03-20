@@ -29,14 +29,18 @@ export interface ApiEndpoint {
   isAuthenticated: boolean;
   requestSchema?: string;
   responseSchema?: string;
+ rateLimitPerMinute?: number | null;
+  rateLimitPerHour?: number | null;
+  rateLimitPerDay?: number | null;
+
 }
 
 export interface ApiDocument {
   docId: number;
   title: string;
   docType: string;
-  content?: string;
-  docUrl?: string;
+  contentText?: string;
+  contentUrl?: string;
   createdAt: string;
 }
 
@@ -64,8 +68,8 @@ export interface CreateEndpointRequest {
 export interface CreateDocumentRequest {
   title: string;
   docType: string;
-  content?: string;
-  docUrl?: string;
+  contentText?: string;
+  contentUrl?: string;
 }
 
 export interface ToastState {

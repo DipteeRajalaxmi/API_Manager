@@ -124,4 +124,15 @@ public interface ApiUsageLogRepository extends JpaRepository<ApiUsageLog, Long> 
       @Query("SELECT COUNT(l) FROM ApiUsageLog l WHERE l.requestTime >= :since")
        long countAllCallsSince(@Param("since") LocalDateTime since);
 
+
+    @Query("SELECT COUNT(l) FROM ApiUsageLog l " +
+       "WHERE l.subscription.subscriptionId = :subId " +
+       "AND l.endpointPath = :path " +
+       "AND l.requestTime >= :since " +
+       "AND l.wasRateLimited = false")
+    long countCallsSinceForEndpoint(
+       @Param("subId")  Long subId,
+       @Param("path")   String path,
+       @Param("since")  LocalDateTime since);
+
 }
