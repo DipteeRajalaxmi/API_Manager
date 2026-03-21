@@ -10,7 +10,7 @@ public class ApiDocumentRequest {
     private String title;
 
     private String docType;
-    private String content;
+    // private String content;
     private String contentUrl;
     private String contentText;
     

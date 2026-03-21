@@ -61,4 +61,14 @@ public class ApiEndpoint {
     
     @Column(name = "rate_limit_per_day")
     private Long rateLimitPerDay;
+
+    @Column(name = "rate_limit_total")
+    private Long rateLimitTotal;
+
+    @Column(name = "is_blocked")
+    @Builder.Default
+    private Boolean isBlocked = false;
+
+    @Column(name = "blocked_reason", columnDefinition = "TEXT")
+    private String blockedReason;
 }

@@ -28,6 +28,8 @@ public class ApiResponse {
     private Long rateLimitPerHour;
     private Long rateLimitPerDay;
     private Long rateLimitTotal;
+    private Boolean isBlocked;
+    private String  blockedReason;
  
     
 }

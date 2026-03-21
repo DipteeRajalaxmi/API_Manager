@@ -19,6 +19,7 @@ import com.apimanager.portal.repository.ApiAllowedDeveloperRepository;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -328,19 +329,20 @@ public class ApiService {
         ApiEndpoint endpoint = apiEndpointRepository.findById(endpointId)
                 .orElseThrow(() -> new RuntimeException("Endpoint not found"));
 
-        if (request.getHttpMethod() != null) endpoint.setHttpMethod(request.getHttpMethod().toUpperCase());
-        if (request.getPath() != null) endpoint.setPath(request.getPath());
-        if (request.getDescription() != null) endpoint.setDescription(request.getDescription());
+        if (request.getHttpMethod()    != null) endpoint.setHttpMethod(request.getHttpMethod().toUpperCase());
+        if (request.getPath()          != null) endpoint.setPath(request.getPath());
+        if (request.getDescription()   != null) endpoint.setDescription(request.getDescription());
         if (request.getRequestSchema() != null) endpoint.setRequestSchema(request.getRequestSchema());
-        if (request.getResponseSchema() != null) endpoint.setResponseSchema(request.getResponseSchema());
-        if (request.getIsAuthenticated() != null) endpoint.setIsAuthenticated(request.getIsAuthenticated());
-        if (request.getRateLimitPerMinute() != null) endpoint.setRateLimitPerMinute(request.getRateLimitPerMinute());
-        if (request.getRateLimitPerHour()   != null) endpoint.setRateLimitPerHour(request.getRateLimitPerHour());
-        if (request.getRateLimitPerDay()    != null) endpoint.setRateLimitPerDay(request.getRateLimitPerDay());
-        // To CLEAR a rate limit pass -1 from frontend:
-        if (request.getRateLimitPerMinute() != null && request.getRateLimitPerMinute() == -1) endpoint.setRateLimitPerMinute(null);
-        if (request.getRateLimitPerHour()   != null && request.getRateLimitPerHour()   == -1) endpoint.setRateLimitPerHour(null);
-        if (request.getRateLimitPerDay()    != null && request.getRateLimitPerDay()    == -1) endpoint.setRateLimitPerDay(null);
+        if (request.getResponseSchema()!= null) endpoint.setResponseSchema(request.getResponseSchema());
+        if (request.getIsAuthenticated()!= null) endpoint.setIsAuthenticated(request.getIsAuthenticated());
+        if (request.getRateLimitPerMinute() != null)
+            endpoint.setRateLimitPerMinute(request.getRateLimitPerMinute() == -1 ? null : request.getRateLimitPerMinute());
+        if (request.getRateLimitPerHour() != null)
+            endpoint.setRateLimitPerHour(request.getRateLimitPerHour() == -1 ? null : request.getRateLimitPerHour());
+        if (request.getRateLimitPerDay() != null)
+            endpoint.setRateLimitPerDay(request.getRateLimitPerDay() == -1 ? null : request.getRateLimitPerDay());
+        if (request.getRateLimitTotal() != null)
+            endpoint.setRateLimitTotal(request.getRateLimitTotal() == -1 ? null : request.getRateLimitTotal());
 
         return mapEndpointToResponse(apiEndpointRepository.save(endpoint));
     }
@@ -409,6 +411,8 @@ public class ApiService {
                 .rateLimitPerHour(api.getRateLimitPerHour())
                 .rateLimitPerDay(api.getRateLimitPerDay())
                 .rateLimitTotal(api.getRateLimitTotal())
+                .isBlocked(api.getIsBlocked())
+                .blockedReason(api.getBlockedReason())
                 .endpoints(api.getEndpoints() != null ?
                         api.getEndpoints().stream().map(this::mapEndpointToResponse).collect(Collectors.toList())
                         : null)
@@ -427,8 +431,58 @@ public class ApiService {
                 .rateLimitPerMinute(endpoint.getRateLimitPerMinute())
                 .rateLimitPerHour(endpoint.getRateLimitPerHour())
                 .rateLimitPerDay(endpoint.getRateLimitPerDay())
+                .rateLimitTotal(endpoint.getRateLimitTotal())
+                .isBlocked(endpoint.getIsBlocked())
+                .blockedReason(endpoint.getBlockedReason())
                 .build();
     }
+
+    public ApiResponse blockApi(Long apiId, String reason) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        Api api = getApiEntity(apiId);
+        User caller = userRepository.findByEmail(email).orElseThrow();
+        checkAuthorized(api, caller);
+        api.setIsBlocked(true);
+        api.setBlockedReason(reason != null ? reason : "Blocked by provider");
+        return mapToResponse(apiRepository.save(api));
+    }
+
+    public ApiResponse unblockApi(Long apiId) {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        Api api = getApiEntity(apiId);
+        User caller = userRepository.findByEmail(email).orElseThrow();
+        checkAuthorized(api, caller);
+        api.setIsBlocked(false);
+        api.setBlockedReason(null);
+        return mapToResponse(apiRepository.save(api));
+    }
+
+    public ApiEndpointResponse blockEndpoint(Long endpointId, String reason) {
+        ApiEndpoint endpoint = apiEndpointRepository.findById(endpointId)
+                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+        endpoint.setIsBlocked(true);
+        endpoint.setBlockedReason(reason != null ? reason : "Blocked by provider");
+        return mapEndpointToResponse(apiEndpointRepository.save(endpoint));
+    }
+
+    public ApiEndpointResponse unblockEndpoint(Long endpointId) {
+        ApiEndpoint endpoint = apiEndpointRepository.findById(endpointId)
+                .orElseThrow(() -> new RuntimeException("Endpoint not found"));
+        endpoint.setIsBlocked(false);
+        endpoint.setBlockedReason(null);
+        return mapEndpointToResponse(apiEndpointRepository.save(endpoint));
+    }
+
+    private void checkAuthorized(Api api, User caller) {
+    boolean isCreator = api.getCreatedBy().getUserId().equals(caller.getUserId());
+    boolean isOrgProvider = caller.getOrganization() != null
+        && api.getOrganization() != null
+        && caller.getOrganization().getOrgId().equals(api.getOrganization().getOrgId())
+        && "API_PROVIDER".equals(caller.getRole().getRoleName());
+
+    if (!isCreator && !isOrgProvider)
+        throw new RuntimeException("Not authorized to modify this API");
+}
 
     
 }

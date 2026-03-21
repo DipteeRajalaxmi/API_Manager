@@ -138,6 +138,8 @@ public class GatewayController {
         if (rl.endpointRemainingHour   != null) h.set("X-RateLimit-Endpoint-Remaining-Hour",   String.valueOf(rl.endpointRemainingHour));
         if (rl.endpointLimitDay        != null) h.set("X-RateLimit-Endpoint-Limit-Day",        String.valueOf(rl.endpointLimitDay));
         if (rl.endpointRemainingDay    != null) h.set("X-RateLimit-Endpoint-Remaining-Day",    String.valueOf(rl.endpointRemainingDay));
+        if (rl.endpointLimitTotal     != null) h.set("X-RateLimit-Endpoint-Limit-Total",     String.valueOf(rl.endpointLimitTotal));
+        if (rl.endpointRemainingTotal != null) h.set("X-RateLimit-Endpoint-Remaining-Total", String.valueOf(rl.endpointRemainingTotal));
     }
 
     private String extractClientIp(HttpServletRequest request) {

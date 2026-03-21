@@ -81,6 +81,7 @@ export async function updateEndpoint(
     rateLimitPerMinute?: number | null;
     rateLimitPerHour?: number | null;
     rateLimitPerDay?: number | null;
+    rateLimitTotal?: number | null;
   }
 ): Promise<ApiEndpoint> {
   const res = await api.put(`/api/apis/endpoints/${endpointId}`, data);
@@ -120,9 +121,18 @@ export const updateRateLimits = async (apiId: number, data: {
   await api.put(`/api/portal/provider/apis/${apiId}/rate-limits`, data);
 };
 
+export const blockApi = async (apiId: number, reason?: string) =>
+  api.patch(`/api/apis/${apiId}/block`, { reason });
 
-// ── Add these to your existing /lib/registry.ts ──────────────────────────────
-// (paste below the existing exports)
+export const unblockApi = async (apiId: number) =>
+  api.patch(`/api/apis/${apiId}/unblock`);
+
+export const blockEndpoint = async (endpointId: number, reason?: string) =>
+  api.patch(`/api/apis/endpoints/${endpointId}/block`, { reason });
+
+export const unblockEndpoint = async (endpointId: number) =>
+  api.patch(`/api/apis/endpoints/${endpointId}/unblock`);
+
 
 
 export interface ImportPreview {

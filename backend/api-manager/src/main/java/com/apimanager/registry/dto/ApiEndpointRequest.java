@@ -17,4 +17,5 @@ public class ApiEndpointRequest {
     private Long rateLimitPerMinute;
     private Long rateLimitPerHour;
     private Long rateLimitPerDay;
+    private Long rateLimitTotal;
 }

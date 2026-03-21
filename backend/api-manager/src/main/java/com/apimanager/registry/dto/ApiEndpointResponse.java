@@ -17,5 +17,8 @@ public class ApiEndpointResponse {
     private Long rateLimitPerMinute;
     private Long rateLimitPerHour;
     private Long rateLimitPerDay;
+    private Long rateLimitTotal;
+    private Boolean isBlocked;
+    private String  blockedReason;
     
 }

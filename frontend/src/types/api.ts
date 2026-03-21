@@ -19,6 +19,8 @@ export interface Api {
   rateLimitPerHour?: number | null;
   rateLimitPerDay?: number | null;
   rateLimitTotal?: number | null;
+  isBlocked?: boolean;
+  blockedReason?: string;
 }
 
 export interface ApiEndpoint {
@@ -32,6 +34,9 @@ export interface ApiEndpoint {
  rateLimitPerMinute?: number | null;
   rateLimitPerHour?: number | null;
   rateLimitPerDay?: number | null;
+  rateLimitTotal?: number | null;
+  isBlocked?: boolean;
+  blockedReason?: string;
 
 }
 

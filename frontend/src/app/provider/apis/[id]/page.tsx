@@ -11,6 +11,7 @@ import {
   getApiById, getEndpoints, getDocuments, getVersions,
   publishApi, deprecateApi, retireApi, createVersion, updateApi, deleteApi,
   addEndpoint, deleteEndpoint, addDocument, deleteDocument, updateRateLimits, updateEndpoint,
+  blockApi, unblockApi, blockEndpoint, unblockEndpoint,
 } from "@/lib/registry";
 import { getProviderSubscriptions, updateSubscriptionStatus } from "@/lib/portal";
 import {
@@ -51,7 +52,7 @@ export default function ApiDetailPage() {
   const [verModal, setVerModal] = useState(false);
 
   const [epForm, setEpForm]   = useState<CreateEndpointRequest>({ httpMethod: "GET", path: "", description: "", isAuthenticated: true });
-  const [docForm, setDocForm] = useState<CreateDocumentRequest>({ title: "", docType: "markdown", contentText: "", contentUrl: "" });
+  const [docForm, setDocForm] = useState<CreateDocumentRequest>({ title: "", docType: "SWAGGER", contentText: "", contentUrl: "" });
   const [newVer, setNewVer]   = useState("");
 
   const [editModal, setEditModal]   = useState(false);
@@ -60,8 +61,13 @@ export default function ApiDetailPage() {
 
   const [epRlModal,  setEpRlModal]  = useState(false);
   const [epRlTarget, setEpRlTarget] = useState<ApiEndpoint | null>(null);
-  const [epRlForm,   setEpRlForm]   = useState({ perMinute: "", perHour: "", perDay: "" });
+  const [epRlForm,   setEpRlForm]   = useState({ perMinute: "", perHour: "", perDay: "", total: "" });
   const [epRlSaving, setEpRlSaving] = useState(false);
+
+  const [blockModal,  setBlockModal]  = useState(false);
+  const [blockReason, setBlockReason] = useState("");
+  const [blockTarget, setBlockTarget] = useState<"api" | ApiEndpoint | null>(null);
+  const [blockSaving, setBlockSaving] = useState(false);
 
   const show = (message: string, type: ToastState["type"] = "success") => setToast({ message, type });
 
@@ -134,7 +140,7 @@ export default function ApiDetailPage() {
     if (!docForm.title) return show("Title is required", "error");
     try {
       await addDocument(apiId, docForm); show("Document added"); setDocModal(false);
-      setDocForm({ title: "", docType: "markdown", contentText: "", contentUrl: "" });
+      setDocForm({ title: "", docType: "SWAGGER", contentText: "", contentUrl: "" });
       getDocuments(apiId).then(setDocuments);
     } catch (e: any) { show(e.response?.data?.error || "Failed", "error"); }
   };
@@ -171,7 +177,7 @@ export default function ApiDetailPage() {
       <div className="p-8 animate-fade-in">
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className="flex items-start justify-between mb-6">
+        <div className="flex items-start justify-between mb-4">
           <div className="flex items-start gap-4">
             <Link href="/provider/apis"
               className="w-9 h-9 bg-white rounded-xl border border-gray-100 flex items-center justify-center
@@ -206,6 +212,25 @@ export default function ApiDetailPage() {
               setEditModal(true);
             }}>✏️ Edit</Button>
 
+            {api.status === "published" && (
+              api.isBlocked ? (
+                <button onClick={async () => {
+                  await unblockApi(apiId);
+                  show("API unblocked — developers can access it again");
+                  loadAll();
+                }} className="px-4 py-2.5 bg-green-50 text-green-600 hover:bg-green-100
+                  text-sm font-semibold rounded-xl transition-colors">
+                  ✅ Unblock API
+                </button>
+              ) : (
+                <button onClick={() => { setBlockTarget("api"); setBlockReason(""); setBlockModal(true); }}
+                  className="px-4 py-2.5 bg-red-50 text-red-500 hover:bg-red-100
+                    text-sm font-semibold rounded-xl transition-colors">
+                  🚫 Block API
+                </button>
+              )
+            )}
+
             {api.status !== "published" && (
               <button onClick={async () => {
                 if (!confirm("Delete this API?")) return;
@@ -236,6 +261,27 @@ export default function ApiDetailPage() {
             )}
           </div>
         </div>
+
+        {/* ── Blocked Banner ─────────────────────────────────────────────── */}
+        {api.isBlocked && (
+          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3 mb-5">
+            <span className="text-xl flex-shrink-0">🚫</span>
+            <div>
+              <p className="text-sm font-bold text-red-600">API Blocked — all developers are getting 503 errors</p>
+              {api.blockedReason && (
+                <p className="text-xs text-red-400 mt-0.5">Reason: {api.blockedReason}</p>
+              )}
+            </div>
+            <button onClick={async () => {
+              await unblockApi(apiId);
+              show("API unblocked");
+              loadAll();
+            }} className="ml-auto text-xs font-semibold px-3 py-1.5 bg-white border border-red-200
+              text-red-500 hover:bg-red-50 rounded-lg transition-all flex-shrink-0">
+              ✅ Unblock Now
+            </button>
+          </div>
+        )}
 
         {/* ── Tabs ───────────────────────────────────────────────────────── */}
         <div className="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
@@ -273,14 +319,15 @@ export default function ApiDetailPage() {
                   <div className="col-span-1">Method</div>
                   <div className="col-span-3">Path</div>
                   <div className="col-span-3">Description</div>
-                  <div className="col-span-3">Endpoint Limits</div>
+                  <div className="col-span-3">Limits / Status</div>
                   <div className="col-span-1">Auth</div>
                   <div className="col-span-1 text-right">Actions</div>
                 </div>
                 <div className="divide-y divide-gray-50">
                   {endpoints.map(ep => (
                     <div key={ep.endpointId}
-                      className="grid grid-cols-12 gap-3 px-6 py-4 items-center hover:bg-gray-50 transition-colors group">
+                      className={`grid grid-cols-12 gap-3 px-6 py-4 items-center transition-colors group
+                        ${ep.isBlocked ? "bg-red-50/30" : "hover:bg-gray-50"}`}>
                       <div className="col-span-1"><MethodBadge method={ep.httpMethod} /></div>
                       <div className="col-span-3">
                         <code className="text-gray-700 text-sm font-mono">{ep.path}</code>
@@ -289,6 +336,11 @@ export default function ApiDetailPage() {
                         <span className="text-gray-400 text-sm truncate block">{ep.description || "—"}</span>
                       </div>
                       <div className="col-span-3 flex flex-wrap gap-1">
+                        {ep.isBlocked && (
+                          <span className="text-xs text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg font-semibold">
+                            🚫 Blocked
+                          </span>
+                        )}
                         {ep.rateLimitPerMinute && (
                           <span className="text-xs bg-teal-50 text-teal-600 border border-teal-100 px-2 py-0.5 rounded-lg font-mono">
                             {ep.rateLimitPerMinute}/min
@@ -304,7 +356,12 @@ export default function ApiDetailPage() {
                             {ep.rateLimitPerDay}/day
                           </span>
                         )}
-                        {!ep.rateLimitPerMinute && !ep.rateLimitPerHour && !ep.rateLimitPerDay && (
+                        {ep.rateLimitTotal && (
+                          <span className="text-xs bg-red-50 text-red-500 border border-red-100 px-2 py-0.5 rounded-lg font-mono">
+                            {ep.rateLimitTotal} total
+                          </span>
+                        )}
+                        {!ep.isBlocked && !ep.rateLimitPerMinute && !ep.rateLimitPerHour && !ep.rateLimitPerDay && !ep.rateLimitTotal && (
                           <span className="text-xs text-gray-300 italic">No limit</span>
                         )}
                       </div>
@@ -321,15 +378,33 @@ export default function ApiDetailPage() {
                               perMinute: ep.rateLimitPerMinute?.toString() ?? "",
                               perHour:   ep.rateLimitPerHour?.toString()   ?? "",
                               perDay:    ep.rateLimitPerDay?.toString()     ?? "",
+                              total:     ep.rateLimitTotal?.toString()      ?? "",
                             });
                             setEpRlModal(true);
                           }}
                           className="opacity-0 group-hover:opacity-100 text-xs px-2 py-1 rounded text-teal-500 hover:bg-teal-50 transition-all">
                           ⚡
                         </button>
+                        <button
+                          title={ep.isBlocked ? "Unblock endpoint" : "Block endpoint"}
+                          onClick={() => {
+                            if (ep.isBlocked) {
+                              unblockEndpoint(ep.endpointId)
+                                .then(() => { show("Endpoint unblocked"); getEndpoints(apiId).then(setEndpoints); })
+                                .catch(() => show("Failed", "error"));
+                            } else {
+                              setBlockTarget(ep);
+                              setBlockReason("");
+                              setBlockModal(true);
+                            }
+                          }}
+                          className={`opacity-0 group-hover:opacity-100 text-xs px-2 py-1 rounded transition-all
+                            ${ep.isBlocked ? "text-green-500 hover:bg-green-50" : "text-red-400 hover:bg-red-50"}`}>
+                          {ep.isBlocked ? "✅" : "🚫"}
+                        </button>
                         <button onClick={() => deleteEndpoint(ep.endpointId).then(() => getEndpoints(apiId).then(setEndpoints))}
                           className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-red-50 transition-all">
-                          Delete
+                          Del
                         </button>
                       </div>
                     </div>
@@ -486,14 +561,12 @@ export default function ApiDetailPage() {
               Endpoint limits are checked first — global limits apply as an overall cap.
             </p>
 
-            {/* ── Global Limits ── */}
+            {/* Global Limits */}
             <div className="card p-6 mb-5">
               <div className="flex items-center gap-2 mb-4">
                 <span className="text-base">🌐</span>
                 <p className="text-sm font-bold text-gray-700">Global API Limits</p>
-                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">
-                  Applies to all endpoints combined
-                </span>
+                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">Applies to all endpoints combined</span>
               </div>
 
               {(api.rateLimitPerMinute || api.rateLimitPerHour || api.rateLimitPerDay || api.rateLimitTotal) ? (
@@ -551,72 +624,74 @@ export default function ApiDetailPage() {
               </Button>
             </div>
 
-            {/* ── Per Endpoint Limits ── */}
+            {/* Per Endpoint Limits */}
             <div className="card overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
-                <div className="flex items-center gap-2">
-                  <span className="text-base">⚡</span>
-                  <p className="text-sm font-bold text-gray-700">Per Endpoint Limits</p>
-                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">
-                    Override limits for specific endpoints
-                  </span>
-                </div>
+              <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-50">
+                <span className="text-base">⚡</span>
+                <p className="text-sm font-bold text-gray-700">Per Endpoint Limits</p>
+                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">Override limits for specific endpoints</span>
               </div>
 
               {endpoints.length === 0 ? (
                 <div className="p-10 text-center">
                   <p className="text-gray-400 text-sm">No endpoints yet.</p>
-                  <button onClick={() => setTab("endpoints")} className="text-teal-500 text-xs font-semibold mt-1">
-                    Add endpoints first →
-                  </button>
+                  <button onClick={() => setTab("endpoints")} className="text-teal-500 text-xs font-semibold mt-1">Add endpoints first →</button>
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-12 gap-3 px-6 py-2.5 bg-gray-50
+                  <div className="grid grid-cols-[80px_1fr_100px_100px_100px_80px_110px] gap-2 px-6 py-2.5 bg-gray-50
                     text-xs font-bold text-gray-400 uppercase tracking-wider">
-                    <div className="col-span-1">Method</div>
-                    <div className="col-span-3">Path</div>
-                    <div className="col-span-2 text-center">Per Minute</div>
-                    <div className="col-span-2 text-center">Per Hour</div>
-                    <div className="col-span-2 text-center">Per Day</div>
-                    <div className="col-span-2 text-right">Action</div>
+                    <div>Method</div>
+                    <div>Path</div>
+                    <div className="text-center">Per Min</div>
+                    <div className="text-center">Per Hour</div>
+                    <div className="text-center">Per Day</div>
+                    <div className="text-center">Total</div>
+                    <div className="text-right">Action</div>
                   </div>
                   <div className="divide-y divide-gray-50">
                     {endpoints.map(ep => (
-                      <div key={ep.endpointId} className="grid grid-cols-12 gap-3 px-6 py-3.5 items-center hover:bg-gray-50">
-                        <div className="col-span-1"><MethodBadge method={ep.httpMethod} /></div>
-                        <div className="col-span-3">
-                          <code className="text-xs font-mono text-gray-700">{ep.path}</code>
+                      <div key={ep.endpointId}
+                        className={`grid grid-cols-[80px_1fr_100px_100px_100px_80px_110px] gap-2 px-6 py-3.5 items-center
+                          ${ep.isBlocked ? "bg-red-50/30" : "hover:bg-gray-50"}`}>
+                        <div><MethodBadge method={ep.httpMethod} /></div>
+                        <div>
+                          <code className="text-xs font-mono text-gray-700 truncate block">{ep.path}</code>
+                          {ep.isBlocked && <span className="text-xs text-red-500 font-semibold">🚫 blocked</span>}
                         </div>
-                        <div className="col-span-2 text-center">
+                        <div className="text-center">
                           {ep.rateLimitPerMinute
-                            ? <span className="text-xs bg-teal-50 text-teal-600 border border-teal-100 px-2.5 py-1 rounded-lg font-mono font-bold">{ep.rateLimitPerMinute}</span>
-                            : <span className="text-xs text-gray-300">∞ unlimited</span>}
+                            ? <span className="text-xs bg-teal-50 text-teal-600 border border-teal-100 px-2 py-0.5 rounded-lg font-mono font-bold">{ep.rateLimitPerMinute}</span>
+                            : <span className="text-xs text-gray-300">∞</span>}
                         </div>
-                        <div className="col-span-2 text-center">
+                        <div className="text-center">
                           {ep.rateLimitPerHour
-                            ? <span className="text-xs bg-blue-50 text-blue-600 border border-blue-100 px-2.5 py-1 rounded-lg font-mono font-bold">{ep.rateLimitPerHour}</span>
-                            : <span className="text-xs text-gray-300">∞ unlimited</span>}
+                            ? <span className="text-xs bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-lg font-mono font-bold">{ep.rateLimitPerHour}</span>
+                            : <span className="text-xs text-gray-300">∞</span>}
                         </div>
-                        <div className="col-span-2 text-center">
+                        <div className="text-center">
                           {ep.rateLimitPerDay
-                            ? <span className="text-xs bg-purple-50 text-purple-600 border border-purple-100 px-2.5 py-1 rounded-lg font-mono font-bold">{ep.rateLimitPerDay}</span>
-                            : <span className="text-xs text-gray-300">∞ unlimited</span>}
+                            ? <span className="text-xs bg-purple-50 text-purple-600 border border-purple-100 px-2 py-0.5 rounded-lg font-mono font-bold">{ep.rateLimitPerDay}</span>
+                            : <span className="text-xs text-gray-300">∞</span>}
                         </div>
-                        <div className="col-span-2 flex justify-end">
-                          <button
-                            onClick={() => {
-                              setEpRlTarget(ep);
-                              setEpRlForm({
-                                perMinute: ep.rateLimitPerMinute?.toString() ?? "",
-                                perHour:   ep.rateLimitPerHour?.toString()   ?? "",
-                                perDay:    ep.rateLimitPerDay?.toString()     ?? "",
-                              });
-                              setEpRlModal(true);
-                            }}
-                            className="text-xs font-semibold px-3 py-1.5 rounded-lg
-                              bg-gray-50 hover:bg-teal-50 text-gray-500 hover:text-teal-600
-                              border border-gray-200 hover:border-teal-200 transition-all">
+                        <div className="text-center">
+                          {ep.rateLimitTotal
+                            ? <span className="text-xs bg-red-50 text-red-500 border border-red-100 px-2 py-0.5 rounded-lg font-mono font-bold">{ep.rateLimitTotal}</span>
+                            : <span className="text-xs text-gray-300">∞</span>}
+                        </div>
+                        <div className="flex justify-end">
+                          <button onClick={() => {
+                            setEpRlTarget(ep);
+                            setEpRlForm({
+                              perMinute: ep.rateLimitPerMinute?.toString() ?? "",
+                              perHour:   ep.rateLimitPerHour?.toString()   ?? "",
+                              perDay:    ep.rateLimitPerDay?.toString()     ?? "",
+                              total:     ep.rateLimitTotal?.toString()      ?? "",
+                            });
+                            setEpRlModal(true);
+                          }} className="text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap
+                            bg-gray-50 hover:bg-teal-50 text-gray-500 hover:text-teal-600
+                            border border-gray-200 hover:border-teal-200 transition-all">
                             ✏️ Set Limit
                           </button>
                         </div>
@@ -762,8 +837,10 @@ export default function ApiDetailPage() {
               onChange={e => setDocForm(p => ({ ...p, title: e.target.value }))} />
             <Select label="Type" value={docForm.docType}
               onChange={e => setDocForm(p => ({ ...p, docType: e.target.value }))}>
-              {["markdown", "howto", "samples", "publicforum", "support"].map(t => <option key={t}>{t}</option>)}
-            </Select>
+                {["SWAGGER", "HOWTO", "SAMPLE", "CHANGELOG", "OTHER"].map(t => (
+                  <option key={t}>{t}</option>
+                ))}           
+             </Select>
             <Textarea label="Content" rows={5} value={docForm.contentText}
               onChange={e => setDocForm(p => ({ ...p, contentText: e.target.value }))} />
             <Input label="External URL" placeholder="https://docs.example.com" value={docForm.contentUrl}
@@ -832,7 +909,7 @@ export default function ApiDetailPage() {
               💡 Endpoint limits are checked <strong>before</strong> API level limits.
               Leave blank to remove the limit for this endpoint.
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <Input label="Per Minute" placeholder="e.g. 30" type="number"
                 value={epRlForm.perMinute}
                 onChange={e => setEpRlForm(p => ({ ...p, perMinute: e.target.value }))} />
@@ -842,9 +919,12 @@ export default function ApiDetailPage() {
               <Input label="Per Day" placeholder="e.g. 5000" type="number"
                 value={epRlForm.perDay}
                 onChange={e => setEpRlForm(p => ({ ...p, perDay: e.target.value }))} />
+              <Input label="Total (lifetime)" placeholder="e.g. 100" type="number"
+                value={epRlForm.total}
+                onChange={e => setEpRlForm(p => ({ ...p, total: e.target.value }))} />
             </div>
-            {(epRlTarget.rateLimitPerMinute || epRlTarget.rateLimitPerHour || epRlTarget.rateLimitPerDay) && (
-              <button onClick={() => setEpRlForm({ perMinute: "", perHour: "", perDay: "" })}
+            {(epRlTarget.rateLimitPerMinute || epRlTarget.rateLimitPerHour || epRlTarget.rateLimitPerDay || epRlTarget.rateLimitTotal) && (
+              <button onClick={() => setEpRlForm({ perMinute: "", perHour: "", perDay: "", total: "" })}
                 className="text-xs text-red-400 hover:text-red-600 font-semibold text-left">
                 ✕ Clear all limits for this endpoint
               </button>
@@ -857,6 +937,7 @@ export default function ApiDetailPage() {
                     rateLimitPerMinute: epRlForm.perMinute ? Number(epRlForm.perMinute) : -1,
                     rateLimitPerHour:   epRlForm.perHour   ? Number(epRlForm.perHour)   : -1,
                     rateLimitPerDay:    epRlForm.perDay     ? Number(epRlForm.perDay)    : -1,
+                    rateLimitTotal:     epRlForm.total      ? Number(epRlForm.total)     : -1,
                   });
                   show("Endpoint rate limits saved");
                   setEpRlModal(false);
@@ -867,6 +948,75 @@ export default function ApiDetailPage() {
               }}>
               {epRlSaving ? "Saving…" : "Save Limits"}
             </Button>
+          </div>
+        </Modal>
+      )}
+
+      {blockModal && blockTarget && (
+        <Modal title={blockTarget === "api" ? "Block Entire API" : "Block Endpoint"}
+          onClose={() => setBlockModal(false)}>
+          <div className="flex flex-col gap-4">
+            <div className="bg-red-50 border border-red-100 rounded-xl p-4">
+              {blockTarget === "api" ? (
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🚫</span>
+                  <div>
+                    <p className="font-bold text-red-700">{api.apiName}</p>
+                    <p className="text-xs text-red-500 mt-0.5">All developers will immediately get 503 errors</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🚫</span>
+                  <div className="flex items-center gap-2">
+                    <MethodBadge method={(blockTarget as ApiEndpoint).httpMethod} />
+                    <code className="text-sm font-mono text-red-700">{(blockTarget as ApiEndpoint).path}</code>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-700">
+              ⚠️ This takes effect immediately. Developers will receive:
+              <code className="block mt-1 bg-white border border-amber-100 rounded p-2 text-amber-600">
+                503 — {blockTarget === "api" ? "API" : "Endpoint"} temporarily unavailable
+              </code>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">
+                Reason (shown to developers)
+              </label>
+              <input value={blockReason} onChange={e => setBlockReason(e.target.value)}
+                placeholder="e.g. Under maintenance, Security patch in progress…"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5
+                  text-sm text-gray-700 focus:outline-none focus:border-red-300 transition-all" />
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={async () => {
+                setBlockSaving(true);
+                try {
+                  if (blockTarget === "api") {
+                    await blockApi(apiId, blockReason);
+                    show("API blocked — all developers getting 503");
+                  } else {
+                    await blockEndpoint((blockTarget as ApiEndpoint).endpointId, blockReason);
+                    show("Endpoint blocked");
+                    getEndpoints(apiId).then(setEndpoints);
+                  }
+                  setBlockModal(false);
+                  loadAll();
+                } catch (e: any) {
+                  show(e.response?.data?.error || "Failed", "error");
+                } finally { setBlockSaving(false); }
+              }} disabled={blockSaving}
+                className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white
+                  text-sm font-bold rounded-xl transition-all disabled:opacity-50">
+                {blockSaving ? "…" : "🚫 Confirm Block"}
+              </button>
+              <Button variant="secondary" onClick={() => setBlockModal(false)}>Cancel</Button>
+            </div>
           </div>
         </Modal>
       )}

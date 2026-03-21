@@ -80,6 +80,13 @@ public class Api {
  
     @Column(name = "rate_limit_total")
     private Long rateLimitTotal;
+
+    @Column(name = "is_blocked")
+    @Builder.Default
+    private Boolean isBlocked = false;
+
+    @Column(name = "blocked_reason", columnDefinition = "TEXT")
+    private String blockedReason;
  
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)

@@ -56,13 +56,33 @@ public class GatewayService {
         // ── 2. Check subscription status ─────────────────────────────────────
         if (!"active".equals(sub.getStatus()))
             throw new GatewayAuthException("Subscription is " + sub.getStatus());
- 
-        // ── 3. Check rate limits ─────────────────────────────────────────────
-        Api api = sub.getApi();
+
+         Api api = sub.getApi();
         String normalizedPath = "/" + apiPath;
+
+        // ── 2.5 Check API blocked ─────────────────────────────────────────────────
+        if (Boolean.TRUE.equals(api.getIsBlocked())) {
+            logCall(apiKey, sub, null, apiPath, method.name(), request,
+                    503L, System.currentTimeMillis() - startMs, false, null);
+            throw new ServiceBlockedException(
+                    "API is temporarily unavailable",
+                    api.getBlockedReason() != null ? api.getBlockedReason() : "This API has been blocked by the provider"
+            );
+        }
+        
 
         // 3a. Match endpoint
         ApiEndpoint matchedEndpoint = findMatchingEndpoint(api, normalizedPath, method.name());
+
+        // ── 3.1 Check endpoint blocked ────────────────────────────────────────────
+    if (matchedEndpoint != null && Boolean.TRUE.equals(matchedEndpoint.getIsBlocked())) {
+        logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
+                503L, System.currentTimeMillis() - startMs, false, null);
+        throw new ServiceBlockedException(
+                "Endpoint is temporarily unavailable",
+                matchedEndpoint.getBlockedReason() != null ? matchedEndpoint.getBlockedReason() : "This endpoint has been blocked by the provider"
+        );
+    }
 
         // 3b. Check endpoint-level rate limits first
         if (matchedEndpoint != null) {
@@ -205,6 +225,11 @@ public class GatewayService {
                 h.endpointLimitDay     = endpoint.getRateLimitPerDay();
                 h.endpointRemainingDay = Math.max(0, endpoint.getRateLimitPerDay() - used);
             }
+            if (endpoint.getRateLimitTotal() != null) {
+                long used = usageLogRepo.countTotalCallsForEndpoint(subId, path);
+                h.endpointLimitTotal     = endpoint.getRateLimitTotal();
+                h.endpointRemainingTotal = Math.max(0, endpoint.getRateLimitTotal() - used);
+            }
         }
         return h;
     }
@@ -288,6 +313,7 @@ public class GatewayService {
         public Long endpointLimitMinute,     endpointRemainingMinute;
         public Long endpointLimitHour,       endpointRemainingHour;
         public Long endpointLimitDay,        endpointRemainingDay;
+        public Long endpointLimitTotal, endpointRemainingTotal;
     }
  
     private static class RateLimitResult {
@@ -410,6 +436,20 @@ public class GatewayService {
             if (used >= endpoint.getRateLimitPerDay())
                 return RateLimitResult.exceeded("PER_DAY", endpoint.getRateLimitPerDay(), 86400);
         }
+        if (endpoint.getRateLimitTotal() != null) {
+            long used = usageLogRepo.countTotalCallsForEndpoint(subId, path);
+            if (used >= endpoint.getRateLimitTotal())
+                return RateLimitResult.exceeded("TOTAL", endpoint.getRateLimitTotal(), 0);
+        }
         return RateLimitResult.ok();
     }
+
+    public static class ServiceBlockedException extends RuntimeException {
+        public final String reason;
+        public ServiceBlockedException(String message, String reason) {
+            super(message);
+            this.reason = reason;
+        }
+    }
 }
+

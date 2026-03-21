@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/apis")
@@ -126,4 +127,39 @@ public class ApiController {
         apiService.deleteDocument(docId);
         return ResponseEntity.noContent().build();
     }
+
+    @PutMapping("/endpoints/{endpointId}")
+    public ResponseEntity<ApiEndpointResponse> updateEndpointDirect(
+            @PathVariable Long endpointId,
+            @RequestBody ApiEndpointRequest request) {
+        return ResponseEntity.ok(apiService.updateEndpoint(endpointId, request));
+    }
+
+    // Block/unblock API
+        @PatchMapping("/{apiId}/block")
+        public ResponseEntity<ApiResponse> blockApi(
+                @PathVariable Long apiId,
+                @RequestBody(required = false) Map<String, String> body) {
+            return ResponseEntity.ok(apiService.blockApi(apiId,
+                    body != null ? body.get("reason") : null));
+        }
+
+        @PatchMapping("/{apiId}/unblock")
+        public ResponseEntity<ApiResponse> unblockApi(@PathVariable Long apiId) {
+            return ResponseEntity.ok(apiService.unblockApi(apiId));
+        }
+
+        // Block/unblock endpoint
+        @PatchMapping("/endpoints/{endpointId}/block")
+        public ResponseEntity<ApiEndpointResponse> blockEndpoint(
+                @PathVariable Long endpointId,
+                @RequestBody(required = false) Map<String, String> body) {
+            return ResponseEntity.ok(apiService.blockEndpoint(endpointId,
+                    body != null ? body.get("reason") : null));
+        }
+
+        @PatchMapping("/endpoints/{endpointId}/unblock")
+        public ResponseEntity<ApiEndpointResponse> unblockEndpoint(@PathVariable Long endpointId) {
+            return ResponseEntity.ok(apiService.unblockEndpoint(endpointId));
+        }
 }
