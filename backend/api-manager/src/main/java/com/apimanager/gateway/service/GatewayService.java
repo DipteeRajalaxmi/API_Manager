@@ -16,6 +16,8 @@ import org.springframework.web.client.RestTemplate;
 import com.apimanager.gateway.service.IpBlocklistService;
 import com.apimanager.registry.entity.ApiEndpoint;
 import java.util.List;
+
+import com.apimanager.portal.repository.SubscriptionEndpointPermissionRepository;
  
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -29,6 +31,8 @@ public class GatewayService {
     private final ApiKeyRepository    apiKeyRepo;
     private final ApiUsageLogRepository usageLogRepo;
     private final RestTemplate        restTemplate;
+    private final SubscriptionEndpointPermissionRepository permissionRepo;
+
     private final java.util.concurrent.ConcurrentHashMap<Long, CircuitBreakerState> circuitBreakers
     = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -83,6 +87,24 @@ public class GatewayService {
                 matchedEndpoint.getBlockedReason() != null ? matchedEndpoint.getBlockedReason() : "This endpoint has been blocked by the provider"
         );
     }
+
+
+    if (matchedEndpoint != null) {
+        boolean hasRestrictions = permissionRepo
+                .existsBySubscription_SubscriptionId(sub.getSubscriptionId());
+        if (hasRestrictions) {
+            boolean isAllowed = permissionRepo
+                    .existsBySubscription_SubscriptionIdAndEndpoint_EndpointId(
+                        sub.getSubscriptionId(), matchedEndpoint.getEndpointId());
+            if (!isAllowed) {
+                logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
+                        403L, System.currentTimeMillis() - startMs, false, null);
+                throw new EndpointNotPermittedException(
+                    "You do not have access to this endpoint");
+            }
+        }
+    }
+
 
         // 3b. Check endpoint-level rate limits first
         if (matchedEndpoint != null) {
@@ -451,5 +473,10 @@ public class GatewayService {
             this.reason = reason;
         }
     }
+
+    public static class EndpointNotPermittedException extends RuntimeException {
+        public EndpointNotPermittedException(String message) { super(message); }
+    }
+
 }
 

@@ -178,4 +178,49 @@ public interface ApiUsageLogRepository extends JpaRepository<ApiUsageLog, Long> 
        @Query("SELECT COUNT(l) FROM ApiUsageLog l WHERE l.developer.userId = :devId")
        long countLogsForDeveloper(@Param("devId") Long devId);
 
+
+       // Monthly calls for the past 12 months
+      @Query("""
+       SELECT 
+       FUNCTION('TO_CHAR', l.requestTime, 'YYYY-MM') as month,
+       COUNT(l) as calls
+       FROM ApiUsageLog l
+       WHERE l.api.organization.orgId = :orgId
+       AND l.requestTime >= :since
+       GROUP BY FUNCTION('TO_CHAR', l.requestTime, 'YYYY-MM')
+       ORDER BY month ASC
+       """)
+       List<Object[]> monthlyCallsForOrg(@Param("orgId") Long orgId,
+                                   @Param("since") LocalDateTime since);
+
+       // Daily calls for a specific month (for calendar)
+       @Query("""
+       SELECT CAST(l.requestTime AS date) as day, COUNT(l) as calls
+       FROM ApiUsageLog l
+       WHERE l.api.organization.orgId = :orgId
+       AND l.requestTime >= :from
+       AND l.requestTime < :to
+       GROUP BY CAST(l.requestTime AS date)
+       ORDER BY day ASC
+       """)
+       List<Object[]> dailyCallsForOrgInRange(@Param("orgId") Long orgId,
+                                          @Param("from") LocalDateTime from,
+                                          @Param("to") LocalDateTime to);
+
+       // Top consumers by call count
+       @Query("""
+       SELECT l.developer.userId, l.developer.name,
+              COUNT(l) as calls,
+              MAX(l.requestTime) as lastCall
+       FROM ApiUsageLog l
+       WHERE l.api.organization.orgId = :orgId
+       AND l.requestTime >= :since
+       AND l.developer IS NOT NULL
+       GROUP BY l.developer.userId, l.developer.name
+       ORDER BY calls DESC
+       """)
+       List<Object[]> topConsumersForOrg(@Param("orgId") Long orgId,
+                                          @Param("since") LocalDateTime since,
+                                          org.springframework.data.domain.Pageable pageable);
+
 }

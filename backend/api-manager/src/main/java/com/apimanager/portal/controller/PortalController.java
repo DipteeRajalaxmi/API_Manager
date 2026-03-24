@@ -88,14 +88,20 @@ public class PortalController {
         return ResponseEntity.ok(portalService.updateSubscriptionStatus(subId, status, userId(http)));
     }
 
-    @PostMapping("/provider/grant-access")
+   @PostMapping("/provider/grant-access")
     public ResponseEntity<SubscriptionResponse> grantAccess(
             @RequestBody GrantAccessRequest req,
             HttpServletRequest http) {
         return ResponseEntity.ok(
-            portalService.grantAccess(req.getDeveloperId(), req.getApiId(), userId(http))
+            portalService.grantAccess(
+                req.getDeveloperId(),
+                req.getApiId(),
+                req.getEndpointIds(),
+                userId(http)
+            )
         );
     }
+
 
 
     // ── API Keys ──────────────────────────────────────────────────────────────

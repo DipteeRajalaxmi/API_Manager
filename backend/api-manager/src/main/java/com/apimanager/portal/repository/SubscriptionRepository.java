@@ -23,9 +23,10 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 
     boolean existsByApplication_AppIdAndApi_ApiId(Long appId, Long apiId);
 
+
+    List<Subscription> findByApi_Organization_OrgId(Long orgId);
     // provider sees all subscriptions to APIs they created
     @Query("SELECT s FROM Subscription s WHERE s.api.createdBy.userId = :providerId")
     List<Subscription> findByApiProvider(@Param("providerId") Long providerId);
 
-    // List<Subscription> findByApplication_Developer_UserId(Long developerId);
 }

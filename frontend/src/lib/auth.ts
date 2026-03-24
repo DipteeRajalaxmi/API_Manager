@@ -93,6 +93,7 @@ export const getNavItems = (role: string) => {
         { href: "/developer/contribute",  icon: "apis",      label: "Contribute API" },
         { href: "/developer/my-requests", icon: "handshake ", label: "My Requests"    },
         { href: "/developer/analytics", icon: "analytics", label: "Analytics" },
+        { href: "/developer/how-to-use", label: "How to Use", icon: "howtouse" },
         { href: "/developer/settings", icon: "settings", label: "Settings" }
       ];
     case "ADMIN":

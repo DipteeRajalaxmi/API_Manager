@@ -20,6 +20,12 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Optional;
+
+import com.apimanager.portal.entity.SubscriptionEndpointPermission;
+import com.apimanager.portal.repository.SubscriptionEndpointPermissionRepository;
+import com.apimanager.registry.entity.ApiEndpoint;
+import com.apimanager.registry.repository.ApiEndpointRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -34,6 +40,8 @@ public class PortalService {
     private final OrganizationRepository         orgRepo;
     private final ApiRepository                  apiRepo;
     private final BCryptPasswordEncoder          passwordEncoder;
+    private final SubscriptionEndpointPermissionRepository permissionRepo;
+    private final ApiEndpointRepository endpointRepo;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -178,7 +186,11 @@ public class PortalService {
 
     // Provider: list all subscriptions to their APIs
     public List<SubscriptionResponse> getSubscriptionsForMyApis(Long providerId) {
-        return subscriptionRepo.findByApiProvider(providerId)
+        User provider = getUser(providerId);
+        if (provider.getOrganization() == null)
+            throw new ApiManagerException("You have no organization");
+        return subscriptionRepo
+            .findByApi_Organization_OrgId(provider.getOrganization().getOrgId())
             .stream()
             .map(this::toSubResponse)
             .collect(Collectors.toList());
@@ -209,13 +221,12 @@ public class PortalService {
     }
 
     @Transactional
-    public SubscriptionResponse grantAccess(Long developerId, Long apiId, Long providerId) {
-
+    public SubscriptionResponse grantAccess(Long developerId, Long apiId,
+                                            List<Long> endpointIds, Long providerId) {
         // 1. Verify provider
         User provider = getUser(providerId);
         if (provider.getOrganization() == null)
             throw new ApiManagerException("Provider has no organization");
-
         Long orgId = provider.getOrganization().getOrgId();
 
         // 2. Verify developer belongs to same org
@@ -229,7 +240,6 @@ public class PortalService {
                 .orElseThrow(() -> new ApiManagerException("API not found"));
         if (!api.getOrganization().getOrgId().equals(orgId))
             throw new ApiManagerException("API does not belong to your organization");
-
         if (!"published".equals(api.getStatus()))
             throw new ApiManagerException("API is not published");
 
@@ -247,37 +257,63 @@ public class PortalService {
                 });
 
         // 5. Check if subscription already exists
-        if (subscriptionRepo.existsByApplication_AppIdAndApi_ApiId(app.getAppId(), apiId)) {
-            // if exists but cancelled — reactivate
-            Subscription existing = subscriptionRepo
-                    .findByApplication_AppIdAndApi_ApiId(app.getAppId(), apiId)
-                    .orElseThrow();
-            if ("cancelled".equals(existing.getStatus()) || "blocked".equals(existing.getStatus())) {
-                existing.setStatus("active");
-                subscriptionRepo.save(existing);
-                // reactivate key
-                apiKeyRepo.findBySubscription_SubscriptionId(existing.getSubscriptionId())
-                        .ifPresent(k -> { k.setStatus("active"); apiKeyRepo.save(k); });
-                return toSubResponse(existing);
-            }
-            throw new ApiManagerException("Developer already has active access to this API");
+        Optional<Subscription> existingOpt =
+                subscriptionRepo.findByApplication_AppIdAndApi_ApiId(app.getAppId(), apiId);
+
+        Subscription sub;
+        boolean isNew = false;
+
+        if (existingOpt.isPresent()) {
+            sub = existingOpt.get();
+            if ("active".equals(sub.getStatus()))
+                throw new ApiManagerException("Developer already has active access to this API");
+            // reactivate
+            sub.setStatus("active");
+            sub = subscriptionRepo.save(sub);
+            // reactivate key
+            apiKeyRepo.findBySubscription_SubscriptionId(sub.getSubscriptionId())
+                    .ifPresent(k -> { k.setStatus("active"); apiKeyRepo.save(k); });
+        } else {
+            // create new
+            sub = new Subscription();
+            sub.setApi(api);
+            sub.setApplication(app);
+            sub.setStatus("active");
+            sub.setApprovedBy(provider);
+            sub = subscriptionRepo.save(sub);
+            isNew = true;
         }
 
-        // 6. Create subscription
-        Subscription sub = new Subscription();
-        sub.setApi(api);
-        sub.setApplication(app);
-        sub.setStatus("active");
-        sub.setApprovedBy(provider);
-        sub = subscriptionRepo.save(sub);
+        // 6. Handle endpoint permissions
+        // Clear existing permissions for this subscription
+        permissionRepo.deleteBySubscription_SubscriptionId(sub.getSubscriptionId());
 
-        // 7. Generate API key
-        String rawKey = generateApiKey(sub, app, "PRODUCTION");
+        boolean hasEndpointRestrictions = endpointIds != null && !endpointIds.isEmpty();
+
+        if (hasEndpointRestrictions) {
+            // Grant only specific endpoints
+            for (Long endpointId : endpointIds) {
+                ApiEndpoint endpoint = endpointRepo.findById(endpointId)
+                        .orElseThrow(() -> new ApiManagerException("Endpoint not found: " + endpointId));
+                SubscriptionEndpointPermission perm = new SubscriptionEndpointPermission();
+                perm.setSubscription(sub);
+                perm.setEndpoint(endpoint);
+                permissionRepo.save(perm);
+            }
+        }
+        // if endpointIds is null/empty → full access (no rows = all endpoints allowed)
+
+        // 7. Generate API key for new subscriptions only
+        String rawKey = null;
+        if (isNew) {
+            rawKey = generateApiKey(sub, app, "PRODUCTION");
+        }
 
         SubscriptionResponse res = toSubResponse(sub);
-        res.setClientId(rawKey); // raw key shown once — provider should share with developer
+        if (rawKey != null) res.setClientId(rawKey);
         return res;
     }
+
 
     // ── API Keys ────
 
