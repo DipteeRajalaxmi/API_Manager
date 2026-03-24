@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
+import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDateTime;
 
@@ -143,5 +144,38 @@ public interface ApiUsageLogRepository extends JpaRepository<ApiUsageLog, Long> 
               long countTotalCallsForEndpoint(
               @Param("subId") Long subId,
               @Param("path")  String path);
+
+       // Endpoint stats per subscription (for developer detail)
+              @Query("SELECT l.endpointPath, l.httpMethod, COUNT(l) " +
+                     "FROM ApiUsageLog l " +
+                     "WHERE l.subscription.subscriptionId = :subId " +
+                     "AND l.requestTime >= :since " +
+                     "AND l.wasRateLimited = false " +
+                     "GROUP BY l.endpointPath, l.httpMethod " +
+                     "ORDER BY COUNT(l) DESC")
+              List<Object[]> endpointStatsForSubscription(
+              @Param("subId") Long subId,
+              @Param("since") LocalDateTime since);
+
+              // Recent logs for a specific developer
+              @Query("SELECT l FROM ApiUsageLog l " +
+                     "WHERE l.developer.userId = :devId " +
+                     "ORDER BY l.requestTime DESC")
+              List<ApiUsageLog> recentLogsForDeveloper(
+              @Param("devId") Long devId,
+              Pageable pageable);
+
+              // Total calls for a developer in a time window
+              @Query("SELECT COUNT(l) FROM ApiUsageLog l " +
+                     "WHERE l.developer.userId = :devId " +
+                     "AND l.requestTime >= :since " +
+                     "AND l.wasRateLimited = false")
+              long countCallsForDeveloperSince(
+              @Param("devId") Long devId,
+              @Param("since") LocalDateTime since);
+
+
+       @Query("SELECT COUNT(l) FROM ApiUsageLog l WHERE l.developer.userId = :devId")
+       long countLogsForDeveloper(@Param("devId") Long devId);
 
 }

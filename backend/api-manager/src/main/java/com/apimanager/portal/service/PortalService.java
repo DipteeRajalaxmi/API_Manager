@@ -208,6 +208,77 @@ public class PortalService {
         return toSubResponse(subscriptionRepo.save(sub));
     }
 
+    @Transactional
+    public SubscriptionResponse grantAccess(Long developerId, Long apiId, Long providerId) {
+
+        // 1. Verify provider
+        User provider = getUser(providerId);
+        if (provider.getOrganization() == null)
+            throw new ApiManagerException("Provider has no organization");
+
+        Long orgId = provider.getOrganization().getOrgId();
+
+        // 2. Verify developer belongs to same org
+        User developer = getUser(developerId);
+        if (developer.getOrganization() == null ||
+            !developer.getOrganization().getOrgId().equals(orgId))
+            throw new ApiManagerException("Developer does not belong to your organization");
+
+        // 3. Verify API belongs to same org
+        Api api = apiRepo.findById(apiId)
+                .orElseThrow(() -> new ApiManagerException("API not found"));
+        if (!api.getOrganization().getOrgId().equals(orgId))
+            throw new ApiManagerException("API does not belong to your organization");
+
+        if (!"published".equals(api.getStatus()))
+            throw new ApiManagerException("API is not published");
+
+        // 4. Find or create default app for developer
+        Application app = applicationRepo
+                .findByDeveloper_UserIdAndAppName(developerId, "Default App")
+                .orElseGet(() -> {
+                    Application newApp = new Application();
+                    newApp.setDeveloper(developer);
+                    newApp.setOrganization(developer.getOrganization());
+                    newApp.setAppName("Default App");
+                    newApp.setDescription("Auto-created by provider");
+                    newApp.setStatus("active");
+                    return applicationRepo.save(newApp);
+                });
+
+        // 5. Check if subscription already exists
+        if (subscriptionRepo.existsByApplication_AppIdAndApi_ApiId(app.getAppId(), apiId)) {
+            // if exists but cancelled — reactivate
+            Subscription existing = subscriptionRepo
+                    .findByApplication_AppIdAndApi_ApiId(app.getAppId(), apiId)
+                    .orElseThrow();
+            if ("cancelled".equals(existing.getStatus()) || "blocked".equals(existing.getStatus())) {
+                existing.setStatus("active");
+                subscriptionRepo.save(existing);
+                // reactivate key
+                apiKeyRepo.findBySubscription_SubscriptionId(existing.getSubscriptionId())
+                        .ifPresent(k -> { k.setStatus("active"); apiKeyRepo.save(k); });
+                return toSubResponse(existing);
+            }
+            throw new ApiManagerException("Developer already has active access to this API");
+        }
+
+        // 6. Create subscription
+        Subscription sub = new Subscription();
+        sub.setApi(api);
+        sub.setApplication(app);
+        sub.setStatus("active");
+        sub.setApprovedBy(provider);
+        sub = subscriptionRepo.save(sub);
+
+        // 7. Generate API key
+        String rawKey = generateApiKey(sub, app, "PRODUCTION");
+
+        SubscriptionResponse res = toSubResponse(sub);
+        res.setClientId(rawKey); // raw key shown once — provider should share with developer
+        return res;
+    }
+
     // ── API Keys ────
 
     public ApiKeyResponse getKeyForSubscription(Long subId, Long developerId) {

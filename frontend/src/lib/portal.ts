@@ -82,3 +82,14 @@ export const addAllowedDeveloper = async (apiId: number, devId: number): Promise
 export const removeAllowedDeveloper = async (apiId: number, devId: number): Promise<void> => {
   await api.delete(`/api/portal/provider/apis/${apiId}/allowed-developers/${devId}`);
 };
+
+export const grantApiAccess = async (
+  developerId: number,
+  apiId: number
+): Promise<SubscribeResponse> => {
+  const res = await api.post("/api/portal/provider/grant-access", {
+    developerId,
+    apiId,
+  });
+  return res.data;
+};

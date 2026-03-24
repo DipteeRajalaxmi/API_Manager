@@ -88,6 +88,16 @@ public class PortalController {
         return ResponseEntity.ok(portalService.updateSubscriptionStatus(subId, status, userId(http)));
     }
 
+    @PostMapping("/provider/grant-access")
+    public ResponseEntity<SubscriptionResponse> grantAccess(
+            @RequestBody GrantAccessRequest req,
+            HttpServletRequest http) {
+        return ResponseEntity.ok(
+            portalService.grantAccess(req.getDeveloperId(), req.getApiId(), userId(http))
+        );
+    }
+
+
     // ── API Keys ──────────────────────────────────────────────────────────────
 
     /** Developer: get key metadata for a subscription (raw key NOT returned) */

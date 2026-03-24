@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+
 import java.util.List;
 import java.util.Optional;
 
@@ -25,4 +26,6 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
     // provider sees all subscriptions to APIs they created
     @Query("SELECT s FROM Subscription s WHERE s.api.createdBy.userId = :providerId")
     List<Subscription> findByApiProvider(@Param("providerId") Long providerId);
+
+    // List<Subscription> findByApplication_Developer_UserId(Long developerId);
 }
