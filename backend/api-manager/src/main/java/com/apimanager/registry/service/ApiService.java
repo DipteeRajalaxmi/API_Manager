@@ -195,14 +195,14 @@ public class ApiService {
                 .orElseThrow(() -> new RuntimeException("API not found: " + apiId));
     }
 
-    public ApiResponse updateApi(Long apiId, ApiRequest request){
+    public ApiResponse updateApi(Long apiId, ApiRequest request) {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
-
         Api api = getApiEntity(apiId);
 
-        if(!api.getCreatedBy().getEmail().equals(email)){
-            throw new RuntimeException("Not authorized to modify this api");
-        }
+        User caller = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        checkAuthorized(api, caller); 
 
         if(api.getStatus().equals("retired")){
             throw new RuntimeException("Retired api's cannot be update");
@@ -227,9 +227,9 @@ public class ApiService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         Api existingApi  = getApiEntity(apiId);
 
-        if (!existingApi.getCreatedBy().getEmail().equals(email)) {
-            throw new RuntimeException("Not authorized");
-        }
+        User caller = userRepository.findByEmail(email)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        checkAuthorized(existingApi, caller);
 
         if (apiRepository.existsByApiNameAndVersionAndOrganization_OrgId(
                 existingApi.getApiName(), newVersion, existingApi.getOrganization().getOrgId())) {
@@ -265,9 +265,9 @@ public class ApiService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         Api api = getApiEntity(apiId);
 
-        if(!api.getCreatedBy().getEmail().equals(email)){
-            throw new RuntimeException("Not authorized");
-        }
+        User caller = userRepository.findByEmail(email)
+        .orElseThrow(() -> new RuntimeException("User not found"));
+        checkAuthorized(api, caller);
 
         ApiDocument doc = ApiDocument.builder()
             .api(api)
@@ -352,47 +352,55 @@ public class ApiService {
     }
 
     public List<ApiResponse> searchPublishedApis(String search, Long categoryId, Long orgId) {
-            String email = SecurityContextHolder.getContext().getAuthentication().getName();
-            User caller = userRepository.findByEmail(email)
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User caller = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-            Long callerOrgId = caller.getOrganization() != null
-                    ? caller.getOrganization().getOrgId()
-                    : null;
+        Long callerOrgId = caller.getOrganization() != null
+                ? caller.getOrganization().getOrgId()
+                : null;
 
-            return apiRepository.findByStatus("published")
-                    .stream()
-                    .filter(api -> {
-                        switch (api.getVisibility()) {
-                            case "public":
-                                return true;
+        // ✅ Check if caller is an API_PROVIDER of the org
+        boolean isOrgProvider = callerOrgId != null &&
+                "API_PROVIDER".equals(caller.getRole().getRoleName());
 
-                            case "private":
-                                if (callerOrgId == null) return false;
-                                return callerOrgId.equals(
-                                    api.getOrganization() != null ? api.getOrganization().getOrgId() : null
-                                );
+        return apiRepository.findByStatus("published")
+                .stream()
+                .filter(api -> {
 
-                            case "restricted":
-                                if (callerOrgId == null) return false;
-                                if (!callerOrgId.equals(
-                                    api.getOrganization() != null ? api.getOrganization().getOrgId() : null
-                                )) return false;
-                                return allowedDevRepository.existsByApi_ApiIdAndDeveloper_UserId(
-                                    api.getApiId(), caller.getUserId()
-                                );
+                    // ✅ Org provider sees ALL published APIs within their org
+                    if (isOrgProvider && callerOrgId.equals(
+                            api.getOrganization() != null ? api.getOrganization().getOrgId() : null)) {
+                        return true;
+                    }
 
-                            default: return false;
-                        }
-                    })
-                    .filter(api -> search == null || search.isBlank() ||
-                            api.getApiName().toLowerCase().contains(search.toLowerCase()))
-                    .filter(api -> categoryId == null ||
-                            (api.getCategory() != null &&
-                            api.getCategory().getCategoryId().equals(categoryId)))
-                    .map(this::mapToResponse)
-                    .collect(Collectors.toList());
-        }
+                    switch (api.getVisibility()) {
+                        case "public":
+                            return true;
+                        case "private":
+                            if (callerOrgId == null) return false;
+                            return callerOrgId.equals(
+                                api.getOrganization() != null ? api.getOrganization().getOrgId() : null
+                            );
+                        case "restricted":
+                            if (callerOrgId == null) return false;
+                            if (!callerOrgId.equals(
+                                api.getOrganization() != null ? api.getOrganization().getOrgId() : null
+                            )) return false;
+                            return allowedDevRepository.existsByApi_ApiIdAndDeveloper_UserId(
+                                api.getApiId(), caller.getUserId()
+                            );
+                        default: return false;
+                    }
+                })
+                .filter(api -> search == null || search.isBlank() ||
+                        api.getApiName().toLowerCase().contains(search.toLowerCase()))
+                .filter(api -> categoryId == null ||
+                        (api.getCategory() != null &&
+                        api.getCategory().getCategoryId().equals(categoryId)))
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
     private ApiResponse mapToResponse(Api api) {
         return ApiResponse.builder()
                 .apiId(api.getApiId())

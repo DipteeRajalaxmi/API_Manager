@@ -12,7 +12,7 @@ import com.apimanager.portal.entity.Subscription;
 import com.apimanager.portal.repository.SubscriptionRepository;
 import com.apimanager.portal.entity.SubscriptionEndpointPermission;
 import com.apimanager.portal.repository.SubscriptionEndpointPermissionRepository;
- 
+import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -86,24 +86,79 @@ public class AnalyticsController {
 
         LocalDateTime now = LocalDateTime.now();
 
-        long today = usageLogRepo.countCallsForDeveloper(user.getUserId(), LocalDate.now(ZoneId.of("Asia/Kolkata")).atStartOfDay());
+        long today = usageLogRepo.countCallsForDeveloper(user.getUserId(), 
+                        LocalDate.now(ZoneId.of("Asia/Kolkata")).atStartOfDay());
         long week  = usageLogRepo.countCallsForDeveloper(user.getUserId(), now.minusDays(7));
+        long month = usageLogRepo.countCallsForDeveloper(user.getUserId(), now.minusDays(30));
+        long total = usageLogRepo.countAllCallsForDeveloper(user.getUserId());
 
-        List<Object[]> apiStats = usageLogRepo.apiStatsForDeveloper(user.getUserId(), now.minusDays(7));
+        List<Object[]> apiStats = usageLogRepo.apiStatsForDeveloper(user.getUserId(), now.minusDays(30));
+        List<Object[]> daily    = usageLogRepo.dailyCallsForDeveloper(user.getUserId(), now.minusDays(30));
 
         List<Map<String, Object>> apis = new ArrayList<>();
         for (Object[] row : apiStats) {
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("apiId",   row[0]);
-            m.put("apiName", row[1]);
-            m.put("calls",   row[2]);
+            m.put("apiId",      row[0]);
+            m.put("apiName",    row[1]);
+            m.put("calls",      row[2]);
+            m.put("avgLatency", row[3] != null ? Math.round((Double) row[3]) : 0);
+            m.put("errors",     row[4]);
             apis.add(m);
         }
 
+        List<Map<String, Object>> dailyCalls = new ArrayList<>();
+        for (Object[] row : daily) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("date",  row[0].toString());
+            m.put("calls", row[1]);
+            dailyCalls.add(m);
+        }
+
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("callsToday",    today);
-        result.put("callsThisWeek", week);
-        result.put("apiBreakdown",  apis);
+        result.put("callsToday",     today);
+        result.put("callsThisWeek",  week);
+        result.put("callsThisMonth", month);
+        result.put("totalCalls",     total);
+        result.put("dailyCalls",     dailyCalls);
+        result.put("apiBreakdown",   apis);
+        return ResponseEntity.ok(result);
+    }
+
+
+    @GetMapping("/developer/logs")
+    public ResponseEntity<Map<String, Object>> getDeveloperLogs(
+            @RequestParam(defaultValue = "0") int page,
+            Authentication auth) {
+
+        User user = userRepo.findByEmail(auth.getName()).orElseThrow();
+
+        int pageSize = 10;
+
+        List<ApiUsageLog> recentLogs = usageLogRepo.recentLogsForDeveloper(
+                user.getUserId(), PageRequest.of(page, pageSize));
+
+        long totalLogs = usageLogRepo.countLogsForDeveloper(user.getUserId());
+
+        // ✅ FIX: create logs list
+        List<Map<String, Object>> logs = new ArrayList<>();
+
+        for (ApiUsageLog log : recentLogs) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("requestTime", log.getRequestTime());
+            m.put("method", log.getHttpMethod());
+            m.put("path", log.getEndpointPath());
+            m.put("status", log.getResponseStatus());
+            m.put("latency", log.getLatencyMs());
+            m.put("rateLimited", log.getWasRateLimited());
+            m.put("apiName", log.getApi() != null ? log.getApi().getApiName() : "—");
+            logs.add(m);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("logs", logs);
+        result.put("totalLogs", totalLogs);
+        result.put("currentPage", page);
+        result.put("totalPages", (int) Math.ceil((double) totalLogs / pageSize));
 
         return ResponseEntity.ok(result);
     }

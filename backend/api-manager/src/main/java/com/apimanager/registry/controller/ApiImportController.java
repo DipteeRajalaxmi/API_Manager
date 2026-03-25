@@ -70,6 +70,23 @@ public class ApiImportController {
         }
     }
 
+
+    @GetMapping("/import/preview-url")
+    public ResponseEntity<?> previewFromUrl(@RequestParam String url) {
+        if (url == null || url.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "url is required"));
+        }
+
+        try {
+            return ResponseEntity.ok(apiImportService.previewFromUrl(url));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Preview failed: " + e.getMessage()));
+        }
+    }
+
     /**
      * POST /api/apis/import/preview
      * Upload a file and get a parsed preview WITHOUT saving anything.

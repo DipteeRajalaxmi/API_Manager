@@ -1,21 +1,67 @@
+# server:
+#   port: 8080
+
+# spring:
+#   application:
+#     name: api-manager
+#   datasource:
+#     url: jdbc:postgresql://localhost:5432/apimanager
+#     username: postgres
+#     password: api_manager
+#     driver-class-name: org.postgresql.Driver
+#   jpa:
+#     hibernate:
+#       ddl-auto: validate
+#     show-sql: true
+#     properties:
+#       hibernate:
+#         format_sql: true
+#   flyway:
+#     enabled: true
+#     locations: classpath:db/migration
+#     baseline-on-migrate: true
+
+# springdoc:
+#   api-docs:
+#     path: /v3/api-docs
+#   swagger-ui:
+#     path: /swagger-ui.html
+#     operationsSorter: method
+#     tagsSorter: alpha
+#     display-request-duration: true
+#     try-it-out-enabled: true
+
+# management:
+#   endpoints:
+#     web:
+#       exposure:
+#         include: health,info
+
+# jwt:
+#   secret: a8f3d2e1b9c7f4a6e2d8b3c1f7e9a4d2b6c8e3f1a7d4b9c2e6f8a3d1b7c4e9
+#   expiration: 86400000
+#   refresh-expiration: 604800000
+
+
+
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 spring:
   application:
     name: api-manager
   datasource:
-    url: jdbc:postgresql://localhost:5432/apimanager
-    username: postgres
-    password: api_manager
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
-    show-sql: true
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    show-sql: ${SHOW_SQL:false}
     properties:
       hibernate:
-        format_sql: true
+        format_sql: ${FORMAT_SQL:false}
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -38,70 +84,6 @@ management:
         include: health,info
 
 jwt:
-  secret: a8f3d2e1b9c7f4a6e2d8b3c1f7e9a4d2b6c8e3f1a7d4b9c2e6f8a3d1b7c4e9
-  expiration: 86400000
-  refresh-expiration: 604800000
-
-
-
-# server:
-#   port: 8080
-
-# spring:
-#   application:
-#     name: api-manager
-
-#   datasource:
-#     url: ${DATABASE_URL}
-#     username: ${DATABASE_USERNAME}
-#     password: ${DATABASE_PASSWORD}
-#     driver-class-name: org.postgresql.Driver
-#     hikari:
-#       connection-timeout: 30000
-#       maximum-pool-size: 5
-#       data-source-properties:
-#         sslmode: require
-#         channel_binding: require
-
-#   jpa:
-#     hibernate:
-#       ddl-auto: validate
-#     show-sql: ${SHOW_SQL:false}
-#     properties:
-#       hibernate:
-#         format_sql: false
-#         dialect: org.hibernate.dialect.PostgreSQLDialect
-#     open-in-view: false
-
-#   flyway:
-#     enabled: true
-#     locations: classpath:db/migration
-#     baseline-on-migrate: true
-#     validate-on-migrate: true
-
-# springdoc:
-#   api-docs:
-#     path: /v3/api-docs
-#   swagger-ui:
-#     path: /swagger-ui.html
-#     operationsSorter: method
-#     tagsSorter: alpha
-#     display-request-duration: true
-#     try-it-out-enabled: true
-
-# management:
-#   endpoints:
-#     web:
-#       exposure:
-#         include: health,info
-#   endpoint:
-#     health:
-#       show-details: never
-
-# jwt:
-#   secret: ${JWT_SECRET}
-#   expiration: ${JWT_EXPIRATION:86400000}
-#   refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
-
-# app:
-#   frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}

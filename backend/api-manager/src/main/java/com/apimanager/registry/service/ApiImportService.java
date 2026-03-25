@@ -99,6 +99,29 @@ public class ApiImportService {
         return buildPreview(openAPI);
     }
 
+    // ── Preview from a remote URl ───────────────────
+        public Map<String, Object> previewFromUrl(String url) {
+            ParseOptions options = new ParseOptions();
+            options.setResolve(true);
+            options.setResolveFully(true);
+
+            OpenAPI openAPI;
+            try {
+                openAPI = new OpenAPIV3Parser().read(url, null, options);
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Could not fetch Swagger from URL: " + e.getMessage());
+            }
+
+            if (openAPI == null || openAPI.getInfo() == null) {
+                throw new IllegalArgumentException(
+                    "Could not parse Swagger from URL. " +
+                    "Make sure the URL points to a valid OpenAPI 2.0 or 3.0 spec (JSON or YAML)."
+                );
+            }
+
+            return buildPreview(openAPI); 
+        }
+
     // ── Core builder ──────────────────────────────────────────────────────────
 
     private Map<String, Object> buildFromOpenApi(OpenAPI openAPI) {

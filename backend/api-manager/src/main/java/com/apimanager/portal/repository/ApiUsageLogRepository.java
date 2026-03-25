@@ -72,7 +72,8 @@ public interface ApiUsageLogRepository extends JpaRepository<ApiUsageLog, Long> 
        List<Object[]> apiStatsForOrg(@Param("orgId") Long orgId,
                                    @Param("since") LocalDateTime since);
 
-       @Query("SELECT l.api.apiId, l.api.apiName, COUNT(l) " +
+       @Query("SELECT l.api.apiId, l.api.apiName, COUNT(l), " +
+              "AVG(l.latencyMs), SUM(CASE WHEN l.responseStatus >= 400 THEN 1 ELSE 0 END) " +
               "FROM ApiUsageLog l " +
               "WHERE l.developer.userId = :devId " +
               "AND l.requestTime >= :since " +
@@ -80,7 +81,6 @@ public interface ApiUsageLogRepository extends JpaRepository<ApiUsageLog, Long> 
               "ORDER BY COUNT(l) DESC")
        List<Object[]> apiStatsForDeveloper(@Param("devId") Long devId,
                                           @Param("since") LocalDateTime since);
-
 
        // Per-developer stats for a specific API
        @Query("SELECT l.developer.userId, l.developer.name, " +
@@ -222,5 +222,23 @@ public interface ApiUsageLogRepository extends JpaRepository<ApiUsageLog, Long> 
        List<Object[]> topConsumersForOrg(@Param("orgId") Long orgId,
                                           @Param("since") LocalDateTime since,
                                           org.springframework.data.domain.Pageable pageable);
+
+
+       // 1. Total calls ever for developer
+       @Query("SELECT COUNT(l) FROM ApiUsageLog l WHERE l.developer.userId = :devId")
+       long countAllCallsForDeveloper(@Param("devId") Long devId);
+
+       // 2. Daily trend for developer
+       @Query(value = "SELECT DATE(request_time) as day, COUNT(*) as calls " +
+                     "FROM api_usage_logs " +
+                     "WHERE developer_id = :devId " +
+                     "AND request_time >= :since " +
+                     "GROUP BY DATE(request_time) " +
+                     "ORDER BY day",
+              nativeQuery = true)
+       List<Object[]> dailyCallsForDeveloper(@Param("devId") Long devId,
+                                          @Param("since") LocalDateTime since);
+
+      
 
 }
