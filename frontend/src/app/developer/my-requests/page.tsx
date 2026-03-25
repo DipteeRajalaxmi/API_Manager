@@ -171,11 +171,11 @@ export default function MyRequestsPage() {
                           Your API has been created as a draft. The provider will publish it.
                         </p>
                       </div>
-                      <Link href={`/provider/apis/${req.createdApiId}`}
+                      {/* <Link href={`/developer/apis/${req.createdApiId}`}
                         className="text-xs font-semibold text-green-600 bg-white border border-green-200
                           px-3 py-1.5 rounded-lg hover:bg-green-50 transition-all flex-shrink-0">
                         View API →
-                      </Link>
+                      </Link> */}
                     </div>
                   )}
 

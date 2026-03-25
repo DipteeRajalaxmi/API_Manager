@@ -6,6 +6,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Input, Select, Textarea, Button } from "@/components/ui/FormFields";
 import Toast from "@/components/ui/Toast";
 import { ToastState } from "@/types/api";
+import { previewSwaggerFile, previewSwaggerUrl } from "@/lib/registry";
 import apiClient from "@/lib/api";
 
 interface EndpointRow {
@@ -26,6 +27,9 @@ export default function ContributePage() {
   const router = useRouter();
   const [toast,   setToast]   = useState<ToastState | null>(null);
   const [loading, setLoading] = useState(false);
+  const [swaggerLoading, setSwaggerLoading] = useState(false);
+  const [importTab,  setImportTab]  = useState<"file" | "url">("file");
+  const [swaggerUrl, setSwaggerUrl] = useState("");
 
   const [form, setForm] = useState({
     apiName:     "",
@@ -111,6 +115,100 @@ export default function ContributePage() {
         {/* Form */}
         <div className="card p-8">
           <div className="flex flex-col gap-5">
+
+            {/* Swagger Import */}
+          <div>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+              Import from Swagger / OpenAPI
+              <span className="text-gray-300 font-normal ml-1">(optional — auto-fills form)</span>
+            </p>
+
+            {/* Tab toggle */}
+            <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit mb-3">
+              {["file", "url"].map(t => (
+                <button key={t} type="button"
+                  onClick={() => setImportTab(t as "file" | "url")}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all
+                    ${importTab === t ? "bg-white text-teal-600 shadow-sm" : "text-gray-400 hover:text-gray-600"}`}>
+                  {t === "file" ? "📄 Upload File" : "🔗 Paste URL"}
+                </button>
+              ))}
+            </div>
+
+            {/* File upload */}
+            {importTab === "file" && (
+              <label className={`flex items-center justify-center gap-3 p-4 rounded-xl border-2 
+                border-dashed border-teal-200 bg-teal-50 hover:bg-teal-100 
+                cursor-pointer transition-all ${swaggerLoading ? "opacity-50 pointer-events-none" : ""}`}>
+                <span className="text-xl">📄</span>
+                <div>
+                  <p className="text-sm font-semibold text-teal-700">
+                    {swaggerLoading ? "Parsing…" : "Upload .json or .yaml file"}
+                  </p>
+                  <p className="text-xs text-teal-500">Auto-fills name, URL, description & endpoints</p>
+                </div>
+                <input type="file" accept=".json,.yaml,.yml" className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setSwaggerLoading(true);
+                    try {
+                      const preview = await previewSwaggerFile(file);
+                      setForm(p => ({
+                        ...p,
+                        apiName:     preview.apiName     || p.apiName,
+                        baseUrl:     preview.baseUrl     || p.baseUrl,
+                        description: preview.description || p.description,
+                      }));
+                      if (preview.endpoints?.length)
+                        setEndpoints(preview.endpoints.map(ep => ({
+                          httpMethod: ep.method, path: ep.path, description: ep.description,
+                        })));
+                      show(`✅ Imported ${preview.endpoints?.length ?? 0} endpoints`);
+                    } catch { show("Failed to parse file", "error"); }
+                    finally { setSwaggerLoading(false); e.target.value = ""; }
+                  }} />
+              </label>
+            )}
+
+            {/* URL import */}
+            {importTab === "url" && (
+              <div className="flex gap-2">
+                <input
+                  value={swaggerUrl}
+                  onChange={e => setSwaggerUrl(e.target.value)}
+                  placeholder="https://petstore.swagger.io/v2/swagger.json"
+                  className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5
+                    text-sm text-gray-700 focus:outline-none focus:border-teal-400 font-mono transition-all" />
+                <button type="button"
+                  disabled={swaggerLoading || !swaggerUrl.trim()}
+                  onClick={async () => {
+                      setSwaggerLoading(true);
+                      try {
+                        const preview = await previewSwaggerUrl(swaggerUrl);
+                        setForm(p => ({
+                          ...p,
+                          apiName:     preview.apiName     || p.apiName,
+                          baseUrl:     preview.baseUrl     || p.baseUrl,
+                          description: preview.description || p.description,
+                        }));
+                        if (preview.endpoints?.length)
+                          setEndpoints(preview.endpoints.map(ep => ({
+                            httpMethod: ep.method, path: ep.path, description: ep.description,
+                          })));
+                        show(`✅ Parsed ${preview.endpoints?.length ?? 0} endpoints — review and submit`);
+                      } catch { show("Failed to fetch or parse URL", "error"); }
+                      finally { setSwaggerLoading(false); }
+                    }}
+
+                  className="px-4 py-2.5 bg-teal-500 hover:bg-teal-600 text-white text-sm 
+                    font-semibold rounded-xl transition-all disabled:opacity-50 whitespace-nowrap">
+                  {swaggerLoading ? "Importing…" : "Import →"}
+                </button>
+              </div>
+            )}
+          </div>
+
 
             {/* Basic info */}
             <div>

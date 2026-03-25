@@ -78,9 +78,9 @@ export const getNavItems = (role: string) => {
       return [
         { href: "/provider/dashboard", icon: "dashboard", label: "Dashboard"   },
         { href: "/provider/apis",      icon: "apis",      label: "My APIs"     },
-        { href: "/marketplace",        icon: "market",    label: "Marketplace" },
         { href: "/provider/api-requests", icon: "handshake", label: "API Requests" },
         { href: "/provider/developers", icon: "users", label: "Developers" },
+        { href: "/marketplace",        icon: "market",    label: "Marketplace" },
         { href: "/provider/analytics", icon: "analytics", label: "Analytics" },
         { href: "/provider/settings", icon: "settings", label: "Settings" }
 

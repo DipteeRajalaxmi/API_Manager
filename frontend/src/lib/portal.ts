@@ -95,6 +95,7 @@ export const removeAllowedDeveloper = async (apiId: number, devId: number): Prom
 // };
 
 
+
 export const grantApiAccess = async (
   developerId: number,
   apiId: number,
@@ -107,3 +108,4 @@ export const grantApiAccess = async (
   });
   return res.data;
 };
+

@@ -171,6 +171,14 @@ export const importSwaggerFile = async (file: File): Promise<ImportResult> => {
   return res.data;
 };
 
+/** Preview from a remote Swagger URL — parses only, does NOT save */
+export const previewSwaggerUrl = async (url: string): Promise<ImportPreview> => {
+  const res = await api.get<ImportPreview>("/api/apis/swagger/import/preview-url", {
+    params: { url },
+  });
+  return res.data;
+};
+
 /** Import from a remote Swagger URL — creates API in DRAFT */
 export const importSwaggerUrl = async (url: string): Promise<ImportResult> => {
   const res = await api.post<ImportResult>("/api/apis/swagger/import-url", { url });
