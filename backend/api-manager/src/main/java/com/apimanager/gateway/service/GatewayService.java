@@ -146,10 +146,23 @@ public class GatewayService {
         try {
             upstream = restTemplate.exchange(targetUrl, method, entity, byte[].class);
             circuit.recordSuccess();
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            log.error("Gateway upstream unreachable: {}", e.getMessage());
+            circuit.recordFailure();
+            logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
+                502L, System.currentTimeMillis() - startMs, false, null);
+            throw new UpstreamUnavailableException("Upstream unreachable: " + targetUrl, e.getMessage());
+
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            log.error("Gateway upstream returned error: {}", e.getStatusCode());
+            circuit.recordSuccess();
+            logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
+                (long) e.getStatusCode().value(), System.currentTimeMillis() - startMs, false, null);
+            throw new UpstreamUnavailableException("Upstream error " + e.getStatusCode(), e.getMessage());
+
         } catch (Exception e) {
             log.error("Gateway upstream error: {}", e.getMessage());
-            circuit.recordFailure(); 
-            // log failed call
+            circuit.recordFailure();
             logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
                 502L, System.currentTimeMillis() - startMs, false, null);
             throw new ApiManagerException("Upstream service error: " + e.getMessage());
@@ -476,6 +489,14 @@ public class GatewayService {
 
     public static class EndpointNotPermittedException extends RuntimeException {
         public EndpointNotPermittedException(String message) { super(message); }
+    }
+
+    public static class UpstreamUnavailableException extends RuntimeException {
+        public final String detail;
+        public UpstreamUnavailableException(String message, String detail) {
+            super(message);
+            this.detail = detail;
+        }
     }
 
 }

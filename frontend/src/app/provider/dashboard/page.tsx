@@ -170,6 +170,7 @@ export default function ProviderDashboard() {
       .then(r=>setMonthlyTrend(r.data)).catch(()=>{});
     apiClient.get("/api/analytics/provider/top-consumers?days=30")
       .then(r=>setTopConsumers(r.data)).catch(()=>{});
+    setTime(new Date());  // ← set immediately on mount
     const t = setInterval(()=>setTime(new Date()), 60000);
     return ()=>clearInterval(t);
   }, []);

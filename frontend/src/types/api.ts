@@ -99,6 +99,8 @@ export interface Subscription {
   apiVersion: string;
   status: string;
   subscribedAt: string;
+  developerName?: string;   
+  developerEmail?: string;
   rateLimitPerMinute?: number | null;
   rateLimitPerHour?: number | null;
   rateLimitPerDay?: number | null;

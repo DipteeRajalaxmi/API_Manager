@@ -359,30 +359,31 @@ export default function ApiAnalyticsDetailPage() {
           </div>
 
           {/* Call logs table */}
-          <div className="panel" style={{ animationDelay:"210ms" }}>
-            <div className="ph">
-              <div className="ph-l">
-                <div className="ph-dot" style={{ background:"linear-gradient(135deg,#f59e0b,#fbbf24)" }} />
-                <span className="ptitle">Recent Call Logs</span>
-              </div>
-              <span className="psub">{totalLogs} total calls · 10 per page</span>
+        <div className="panel" style={{ animationDelay:"210ms" }}>
+          <div className="ph">
+            <div className="ph-l">
+              <div className="ph-dot" style={{ background:"linear-gradient(135deg,#f59e0b,#fbbf24)" }} />
+              <span className="ptitle">Recent Call Logs</span>
             </div>
+            <span className="psub">{totalLogs} total calls </span>
+          </div>
 
-            {loading ? (
-              [1,2,3,4,5].map(i=>(
-                <div key={i} className="sk-row" style={{gap:"1.25rem"}}>
-                  <div className="sk" style={{width:90,height:10}} />
-                  <div className="sk" style={{width:44,height:20,borderRadius:6}} />
-                  <div className="sk" style={{width:130,height:10}} />
-                  <div className="sk" style={{width:48,height:20,borderRadius:6}} />
-                  <div className="sk" style={{width:75,height:10}} />
-                  <div className="sk" style={{width:50,height:10}} />
-                  <div className="sk" style={{width:85,height:10}} />
-                </div>
-              ))
-            ) : !data?.recentLogs?.length ? (
-              <div className="empty"><div className="empty-ico">📋</div><p>No call logs yet</p></div>
-            ) : (
+          {loading ? (
+            [1,2,3,4,5].map(i=>(
+              <div key={i} className="sk-row" style={{gap:"1.25rem"}}>
+                <div className="sk" style={{width:90,height:10}} />
+                <div className="sk" style={{width:44,height:20,borderRadius:6}} />
+                <div className="sk" style={{width:130,height:10}} />
+                <div className="sk" style={{width:48,height:20,borderRadius:6}} />
+                <div className="sk" style={{width:75,height:10}} />
+                <div className="sk" style={{width:50,height:10}} />
+                <div className="sk" style={{width:85,height:10}} />
+              </div>
+            ))
+          ) : !data?.recentLogs?.length ? (
+            <div className="empty"><div className="empty-ico">📋</div><p>No call logs yet</p></div>
+          ) : (
+            <>
               <div className="tbl-scroll">
                 <table className="lt">
                   <thead>
@@ -405,13 +406,20 @@ export default function ApiAnalyticsDetailPage() {
                               <span className={`sd sd-${t}`} />{log.status}
                             </span>
                           </td>
-                          <td className="c-mng">{statusMeaning(log.status)}</td>
-                          <td className={`c-lat ${lc}`}>{log.latency}ms</td>
-                          <td>
+                          {/* Meaning — highlights Rate Limited here */}
+                          <td className="c-mng">
                             {log.rateLimited
                               ? <span className="rl">Rate Limited</span>
-                              : <span className="dc"><span className="dc-d"/>{log.developerName}</span>
+                              : statusMeaning(log.status)
                             }
+                          </td>
+                          <td className={`c-lat ${lc}`}>{log.latency}ms</td>
+                          {/* Developer — always show name */}
+                          <td>
+                            <span className="dc">
+                              <span className="dc-d"/>
+                              {log.developerName || "—"}
+                            </span>
                           </td>
                         </tr>
                       );
@@ -419,54 +427,57 @@ export default function ApiAnalyticsDetailPage() {
                   </tbody>
                 </table>
               </div>
-            )}
-          </div>
-            {/* Pagination */}
-{totalPages > 1 && (
-  <div style={{
-    display: "flex", alignItems: "center", justifyContent: "space-between",
-    padding: ".75rem 1.5rem", background: "var(--gray-50)",
-    borderTop: "1px solid var(--gray-100)"
-  }}>
-    <span style={{ fontSize: ".75rem", color: "var(--gray-400)" }}>
-      Showing {page * 10 + 1}–{Math.min((page + 1) * 10, totalLogs)} of {totalLogs} calls
-    </span>
-    <div style={{ display: "flex", gap: ".5rem" }}>
-      <button
-        onClick={() => setPage(p => Math.max(0, p - 1))}
-        disabled={page === 0}
-        style={{
-          padding: ".4rem .9rem", borderRadius: ".5rem", fontSize: ".78rem",
-          fontWeight: 600, border: "1px solid var(--gray-200)",
-          background: page === 0 ? "var(--gray-50)" : "var(--white)",
-          color: page === 0 ? "var(--gray-300)" : "var(--gray-600)",
-          cursor: page === 0 ? "not-allowed" : "pointer"
-        }}>
-        ← Prev
-      </button>
-      <span style={{
-        padding: ".4rem .9rem", borderRadius: ".5rem", fontSize: ".78rem",
-        fontWeight: 700, background: "var(--teal-500)", color: "#fff"
-      }}>
-        {page + 1} / {totalPages}
-      </span>
-      <button
-        onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-        disabled={page >= totalPages - 1}
-        style={{
-          padding: ".4rem .9rem", borderRadius: ".5rem", fontSize: ".78rem",
-          fontWeight: 600, border: "1px solid var(--gray-200)",
-          background: page >= totalPages - 1 ? "var(--gray-50)" : "var(--white)",
-          color: page >= totalPages - 1 ? "var(--gray-300)" : "var(--gray-600)",
-          cursor: page >= totalPages - 1 ? "not-allowed" : "pointer"
-        }}>
-        Next →
-      </button>
-    </div>
-  </div>
-)}
+
+              {/* Pagination — inside the panel */}
+              {totalPages > 1 && (
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: ".75rem 1.5rem",
+                  borderTop: "1px solid var(--s100)"
+                }}>
+                  <span style={{ fontSize: ".75rem", color: "var(--s400)" }}>
+                    Showing {page * 10 + 1}–{Math.min((page + 1) * 10, totalLogs)} of {totalLogs} calls
+                  </span>
+                  <div style={{ display: "flex", gap: ".5rem", alignItems: "center" }}>
+                    <button
+                      onClick={() => setPage(p => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                      style={{
+                        padding: ".4rem .9rem", borderRadius: ".5rem", fontSize: ".78rem",
+                        fontWeight: 600, border: "1px solid var(--s200)",
+                        background: page === 0 ? "var(--s50)" : "var(--w)",
+                        color: page === 0 ? "var(--s300)" : "var(--s600)",
+                        cursor: page === 0 ? "not-allowed" : "pointer"
+                      }}>
+                      ← Prev
+                    </button>
+                    <span style={{
+                      padding: ".4rem .9rem", borderRadius: ".5rem", fontSize: ".78rem",
+                      fontWeight: 700, background: "var(--t6)", color: "#fff"
+                    }}>
+                      {page + 1} / {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                      disabled={page >= totalPages - 1}
+                      style={{
+                        padding: ".4rem .9rem", borderRadius: ".5rem", fontSize: ".78rem",
+                        fontWeight: 600, border: "1px solid var(--s200)",
+                        background: page >= totalPages - 1 ? "var(--s50)" : "var(--w)",
+                        color: page >= totalPages - 1 ? "var(--s300)" : "var(--s600)",
+                        cursor: page >= totalPages - 1 ? "not-allowed" : "pointer"
+                      }}>
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
-      </div>
-    </DashboardLayout>
-  );
-}
+
+        </div>
+        </div>
+        </DashboardLayout>
+        );
+      }

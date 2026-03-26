@@ -220,9 +220,9 @@ public class AnalyticsController {
         result.put("developers", developers);
         result.put("recentLogs", logs);
         result.put("dailyCalls", dailyCalls);
-        // result.put("totalLogs",   totalLogs);
-        // result.put("currentPage", page);
-        // result.put("totalPages",  (int) Math.ceil((double) totalLogs / 10));
+         result.put("totalLogs",   totalLogs);
+         result.put("currentPage", page);
+         result.put("totalPages",  (int) Math.ceil((double) totalLogs / 10));
 
         return ResponseEntity.ok(result);
     }

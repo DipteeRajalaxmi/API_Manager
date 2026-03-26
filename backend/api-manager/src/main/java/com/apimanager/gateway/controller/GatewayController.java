@@ -112,8 +112,15 @@ public class GatewayController {
                             "retryAfterSeconds", 30
                     ));
 
+        } catch (GatewayService.UpstreamUnavailableException e) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(Map.of(
+                        "error",  "Upstream unreachable",
+                        "detail", e.detail,
+                        "hint",   "Check that the provider's base URL is correct and the server is running"
+                    ));
         } catch (Exception e) {
-            log.error("Gateway error: {}", e.getMessage());
+                    log.error("Gateway error: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body(Map.of("error", "Gateway error: " + e.getMessage()));
         }
