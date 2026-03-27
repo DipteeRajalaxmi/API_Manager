@@ -26,4 +26,8 @@ public class AuthRequest {
     // DEVELOPER only (optional)
     private String inviteCode;
 
+    // password reset
+    private String resetToken;
+    private String newPassword;
+
 }

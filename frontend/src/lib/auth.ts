@@ -60,6 +60,14 @@ export const isLoggedIn = (): boolean => {
   return !!localStorage.getItem("token");
 };
 
+export const forgotPassword = async (email: string): Promise<void> => {
+  await api.post("/api/auth/forgot-password", { email });
+};
+
+export const resetPassword = async (token: string, newPassword: string): Promise<void> => {
+  await api.post("/api/auth/reset-password", { resetToken: token, newPassword });
+};
+
 // ── Role routing ──────────────────────────────────────────────────────────────
 
 export const getHomeRoute = (role: string): string => {
@@ -85,17 +93,21 @@ export const getNavItems = (role: string) => {
         { href: "/provider/settings", icon: "settings", label: "Settings" }
 
       ];
-    case "DEVELOPER":
+    case "DEVELOPER": {
+      const user = getUser();
       return [
-        { href: "/developer/dashboard", icon: "dashboard", label: "Dashboard"   },
-        { href: "/marketplace",         icon: "market",    label: "Marketplace" },
-        { href: "/developer/apps",      icon: "apps",      label: "My Apps"     },
-        { href: "/developer/contribute",  icon: "apis",      label: "Contribute API" },
-        { href: "/developer/my-requests", icon: "handshake ", label: "My Requests"    },
-        { href: "/developer/analytics", icon: "analytics", label: "Analytics" },
-        { href: "/developer/how-to-use", label: "How to Use", icon: "howtouse" },
-        { href: "/developer/settings", icon: "settings", label: "Settings" }
+        { href: "/developer/dashboard",  icon: "dashboard", label: "Dashboard"   },
+        { href: "/marketplace",          icon: "market",    label: "Marketplace" },
+        { href: "/developer/apps",       icon: "apps",      label: "My Apps"     },
+        { href: "/developer/analytics",  icon: "analytics", label: "Analytics"   },
+        { href: "/developer/how-to-use", icon: "howtouse",  label: "How to Use"  },
+        { href: "/developer/settings",   icon: "settings",  label: "Settings"    },
+        ...(user?.orgId ? [
+          { href: "/developer/contribute",  icon: "apis",      label: "Contribute API" },
+          { href: "/developer/my-requests", icon: "handshake", label: "My Requests"    },
+        ] : []),
       ];
+    }
     case "ADMIN":
       return [
         { href: "/admin/dashboard",      icon: "dashboard", label: "Dashboard"     },

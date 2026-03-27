@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import apiClient from "@/lib/api";
+import OrgGuard from "@/components/OrgGuard";
+
 
 interface ApiRequestItem {
   requestId: number;
@@ -55,6 +57,7 @@ export default function MyRequestsPage() {
   const changes   = requests.filter(r => r.status === "changes_requested").length;
 
   return (
+    <OrgGuard>
     <DashboardLayout>
       <div className="p-8 animate-fade-in">
 
@@ -248,5 +251,6 @@ export default function MyRequestsPage() {
         )}
       </div>
     </DashboardLayout>
+    </OrgGuard>
   );
 }

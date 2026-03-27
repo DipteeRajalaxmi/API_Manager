@@ -8,6 +8,7 @@ import Toast from "@/components/ui/Toast";
 import { ToastState } from "@/types/api";
 import { previewSwaggerFile, previewSwaggerUrl } from "@/lib/registry";
 import apiClient from "@/lib/api";
+import OrgGuard from "@/components/OrgGuard";
 
 interface EndpointRow {
   httpMethod: string;
@@ -84,6 +85,7 @@ export default function ContributePage() {
   };
 
   return (
+    <OrgGuard>
     <DashboardLayout>
       <div className="p-8 max-w-2xl animate-fade-in">
 
@@ -307,5 +309,6 @@ export default function ContributePage() {
 
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </DashboardLayout>
+    </OrgGuard>
   );
 }

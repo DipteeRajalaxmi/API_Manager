@@ -87,3 +87,12 @@ jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:86400000}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+brevo:
+  api-key: ${BREVO_API_KEY}
+  sender-email: ${BREVO_SENDER_EMAIL}
+  sender-name: ${BREVO_SENDER_NAME}
+
+app:
+  frontend-url: ${FRONTEND_URL}
+  password-reset-expiry-minutes: ${PASSWORD_RESET_TOKEN_EXPIRY_MINUTES:60}

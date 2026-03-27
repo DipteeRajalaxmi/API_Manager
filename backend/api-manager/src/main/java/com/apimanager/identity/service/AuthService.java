@@ -14,9 +14,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.util.Base64;
+import org.springframework.beans.factory.annotation.Value;
 
 @Service
 @RequiredArgsConstructor
+
 
 public class AuthService {
 
@@ -25,6 +30,13 @@ public class AuthService {
     private final OrganizationRepository organizationRepository;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
+
+    @Value("${app.password-reset-expiry-minutes}")
+    private int resetExpiryMinutes;
+
+    private final BrevoEmailService brevoEmailService;
 
     public AuthResponse register(AuthRequest request) {
 
@@ -137,5 +149,65 @@ public class AuthService {
         for (int i = 0; i < 4; i++)
             sb.append(chars.charAt(random.nextInt(chars.length())));
         return sb.toString();
+    }
+
+    public void forgotPassword(String email) {
+        userRepository.findByEmail(email).ifPresent(user -> {
+            try {
+                // Generate secure random token
+                byte[] bytes = new byte[32];
+                new SecureRandom().nextBytes(bytes);
+                String rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+
+                // Hash it before storing
+                String tokenHash = hashToken(rawToken);
+
+                // Save hash + expiry
+                user.setResetTokenHash(tokenHash);
+                user.setResetTokenExpiresAt(LocalDateTime.now().plusMinutes(resetExpiryMinutes));
+                userRepository.save(user);
+
+                // Build reset link (raw token goes to frontend)
+                String resetLink = frontendUrl + "/reset-password?token=" + rawToken;
+
+                // Send via Brevo
+                brevoEmailService.sendPasswordResetEmail(
+                    user.getEmail(),
+                    user.getName(),
+                    resetLink,
+                    user.getRole().getRoleName()
+                );
+
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to send reset email", e);
+            }
+        });
+    }
+
+// ─── RESET PASSWORD ───────────────────────────────────────────────────
+    public void resetPassword(String rawToken, String newPassword) {
+        String tokenHash = hashToken(rawToken);
+
+        User user = userRepository.findByResetTokenHash(tokenHash)
+                .orElseThrow(() -> new RuntimeException("Invalid or expired reset token"));
+
+        if (user.getResetTokenExpiresAt().isBefore(LocalDateTime.now()))
+            throw new RuntimeException("Reset token has expired");
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setResetTokenHash(null);
+        user.setResetTokenExpiresAt(null);
+        userRepository.save(user);
+    }
+
+// ─── HELPER ───────────────────────────────────────────────────────────
+    private String hashToken(String rawToken) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(rawToken.getBytes());
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(hash);
+        } catch (Exception e) {
+            throw new RuntimeException("Token hashing failed", e);
+        }
     }
 }
