@@ -375,7 +375,7 @@ public class GatewayService {
 
 
     private static class CircuitBreakerState {
-        private static final int    FAILURE_THRESHOLD = 5;
+        private static final int    FAILURE_THRESHOLD = 10;
         private static final long   COOLDOWN_MS       = 30_000; // 30 seconds
 
         private int  failures    = 0;

@@ -3,6 +3,16 @@ import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import api from "@/lib/api";
 
+const forgotPassword = async (email: string): Promise<void> => {
+  await api.post("/api/auth/forgot-password", { email });
+};
+const logoutAndRedirect = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("user");
+  window.location.href = "/login";
+};
+
 interface UserProfile {
   userId: number;
   email: string;
@@ -26,9 +36,194 @@ const formatDate = (d: string | null) =>
       })
     : "—";
 
+// Shared modal styles
+const S = {
+  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 20 } as React.CSSProperties,
+  modal:   { background: "#fff", borderRadius: 20, width: "100%", maxWidth: 440, boxShadow: "0 20px 60px rgba(0,0,0,0.18)", overflow: "hidden", fontFamily: "'DM Sans',sans-serif" } as React.CSSProperties,
+  header:  { display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "22px 24px 16px", borderBottom: "1px solid #f3f4f6" } as React.CSSProperties,
+  title:   { fontSize: 17, fontWeight: 800, color: "#111827", margin: 0, letterSpacing: "-0.01em" } as React.CSSProperties,
+  sub:     { fontSize: 12, color: "#6b7280", margin: "3px 0 0" } as React.CSSProperties,
+  footer:  { display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 } as React.CSSProperties,
+  iconBtn: { background: "none", border: "none", color: "#9ca3af", cursor: "pointer", padding: 4, borderRadius: 6, lineHeight: "0", flexShrink: 0 } as React.CSSProperties,
+  infoBox: { background: "#f0fdfa", border: "1px solid #99f6e4", borderRadius: 10, padding: "12px 14px", marginBottom: 16, display: "flex", alignItems: "flex-start", gap: 10 } as React.CSSProperties,
+  errTxt:  { fontSize: 12, color: "#ef4444", margin: "4px 0 0" } as React.CSSProperties,
+  primary: { padding: "9px 20px", borderRadius: 10, background: "linear-gradient(135deg,#0d9488,#0891b2)", border: "none", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" } as React.CSSProperties,
+  ghost:   { padding: "9px 18px", borderRadius: 10, border: "1.5px solid #e5e7eb", background: "#fff", color: "#374151", fontSize: 13, fontWeight: 600, cursor: "pointer" } as React.CSSProperties,
+  danger:  { padding: "9px 20px", borderRadius: 10, background: "#ef4444", border: "none", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer" } as React.CSSProperties,
+  input:   { width: "100%", padding: "10px 14px", border: "1.5px solid #e5e7eb", borderRadius: 10, fontSize: 14, color: "#111827", outline: "none", boxSizing: "border-box" as const, background: "#fafafa", fontFamily: "'DM Sans',sans-serif" } as React.CSSProperties,
+};
+
+// ── Change Password Modal ──────────────────────────────────────────────────────
+function ChangePasswordModal({ userEmail, onClose }: { userEmail: string; onClose: () => void }) {
+  const [step, setStep]         = useState<"confirm" | "sent">("confirm");
+  const [loading, setLoading]   = useState(false);
+  const [apiError, setApiError] = useState("");
+
+  async function handleSend() {
+    setLoading(true);
+    setApiError("");
+    try {
+      await forgotPassword(userEmail);
+      setStep("sent");
+    } catch {
+      setApiError("Failed to send reset email. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div style={S.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={S.modal}>
+        <div style={S.header}>
+          <div>
+            <h2 style={S.title}>Change password</h2>
+            <p style={S.sub}>{step === "confirm" ? "We'll send a reset link to your email" : "Reset link sent — check your inbox"}</p>
+          </div>
+          <button style={S.iconBtn} onClick={onClose}>
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div style={{ padding: "20px 24px 24px" }}>
+          {step === "confirm" && (
+            <>
+              <div style={S.infoBox}>
+                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#0d9488" strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+                <p style={{ margin: 0, fontSize: 13, color: "#0f766e", lineHeight: 1.6 }}>
+                  A password reset link will be sent to{" "}
+                  <strong style={{ fontFamily: "'DM Mono',monospace", fontSize: 12 }}>{userEmail}</strong>.
+                  {" "}Click the link in the email to set your new password.
+                </p>
+              </div>
+              {apiError && <p style={S.errTxt}>{apiError}</p>}
+              <div style={S.footer}>
+                <button style={S.ghost} onClick={onClose}>Cancel</button>
+                <button style={{ ...S.primary, opacity: loading ? 0.7 : 1 }} onClick={handleSend} disabled={loading}>
+                  {loading ? "Sending…" : "Send reset link"}
+                </button>
+              </div>
+            </>
+          )}
+
+          {step === "sent" && (
+            <div style={{ textAlign: "center", padding: "8px 0 4px" }}>
+              <div style={{ width: 56, height: 56, borderRadius: "50%", background: "linear-gradient(135deg,#14b8a6,#0891b2)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px", boxShadow: "0 4px 20px rgba(20,184,166,0.3)" }}>
+                <svg width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+              </div>
+              <p style={{ fontSize: 15, fontWeight: 700, color: "#111827", margin: "0 0 8px" }}>Email sent!</p>
+              <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 6px", lineHeight: 1.6 }}>
+                Check your inbox at <strong style={{ fontFamily: "'DM Mono',monospace", fontSize: 12, color: "#374151" }}>{userEmail}</strong>
+              </p>
+              <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 24px", lineHeight: 1.6 }}>
+                Click the <strong style={{ color: "#0d9488" }}>Reset Password</strong> button in the email. The link expires in <strong>1 hour</strong>.
+              </p>
+              <button style={{ ...S.primary, width: "100%" }} onClick={onClose}>Done</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Delete Account Modal ───────────────────────────────────────────────────────
+function DeleteAccountModal({ onClose }: { onClose: () => void }) {
+  const [step, setStep]       = useState<"warn" | "confirm">("warn");
+  const [typed, setTyped]     = useState("");
+  const [loading, setLoading] = useState(false);
+  const WORD = "DELETE";
+
+  async function handleDelete() {
+    if (typed !== WORD) return;
+    setLoading(true);
+    try {
+      await api.delete("/api/users/me");
+      logoutAndRedirect();
+    } catch {
+      setLoading(false);
+      alert("Failed to delete account. Please contact support.");
+    }
+  }
+
+  return (
+    <div style={S.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={S.modal}>
+        <div style={S.header}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: "#fef2f2", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+              </svg>
+            </div>
+            <div>
+              <h2 style={{ ...S.title, color: "#dc2626" }}>Delete account</h2>
+              <p style={S.sub}>This action is permanent and cannot be undone</p>
+            </div>
+          </div>
+          <button style={S.iconBtn} onClick={onClose}>
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div style={{ padding: "20px 24px 24px" }}>
+          {step === "warn" ? (
+            <>
+              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: "#991b1b", margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                  The following will be permanently deleted:
+                </p>
+                <ul style={{ margin: 0, paddingLeft: 16, fontSize: 13, color: "#7f1d1d", lineHeight: 2 }}>
+                  <li>Your profile and account data</li>
+                  <li>All APIs you've subscribed to</li>
+                  <li>Organization memberships</li>
+                  <li>All access tokens</li>
+                </ul>
+              </div>
+              <div style={S.footer}>
+                <button style={S.ghost} onClick={onClose}>Cancel</button>
+                <button style={S.danger} onClick={() => setStep("confirm")}>I understand, continue</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: 13, color: "#374151", marginBottom: 14, lineHeight: 1.6 }}>
+                Type <strong style={{ fontFamily: "'DM Mono',monospace", color: "#ef4444", letterSpacing: 2 }}>{WORD}</strong> to confirm:
+              </p>
+              <input
+                type="text"
+                value={typed}
+                onChange={e => setTyped(e.target.value.toUpperCase())}
+                placeholder={WORD}
+                style={{ ...S.input, letterSpacing: 3, fontFamily: "'DM Mono',monospace", fontWeight: 700, textAlign: "center", borderColor: typed === WORD ? "#ef4444" : "#e5e7eb" }}
+              />
+              <div style={S.footer}>
+                <button style={S.ghost} onClick={() => { setStep("warn"); setTyped(""); }}>Back</button>
+                <button
+                  style={{ ...S.danger, opacity: typed === WORD && !loading ? 1 : 0.45, cursor: typed === WORD ? "pointer" : "not-allowed" }}
+                  onClick={handleDelete}
+                  disabled={typed !== WORD || loading}
+                >
+                  {loading ? "Deleting…" : "Permanently delete account"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main Developer Settings Page ───────────────────────────────────────────────
 export default function DeveloperSettingsPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [modal, setModal]     = useState<"password" | "delete" | null>(null);
 
   useEffect(() => {
     api
@@ -46,19 +241,13 @@ export default function DeveloperSettingsPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap');
 
-        /* Uses global: --bg, --teal, --teal-dark, --blue from globals.css */
-        /* Uses global: .card, .card-lift, .grad-teal, .animate-fade-in, .stagger */
-
         .sp-page {
           background: var(--bg);
           min-height: 100vh;
           padding: 2rem 2.5rem 4rem;
         }
 
-        /* ── Page heading ── */
-        .sp-heading {
-          margin-bottom: 1.75rem;
-        }
+        .sp-heading { margin-bottom: 1.75rem; }
         .sp-eyebrow {
           font-size: .67rem;
           font-weight: 800;
@@ -88,7 +277,6 @@ export default function DeveloperSettingsPage() {
           margin-top: .6rem;
         }
 
-        /* ── Grid ── */
         .sp-grid {
           max-width: 760px;
           display: grid;
@@ -97,7 +285,6 @@ export default function DeveloperSettingsPage() {
         }
         .sp-full { grid-column: 1 / -1; }
 
-        /* ── Profile card strip (dark navy top) ── */
         .profile-strip {
           background: linear-gradient(130deg, #1a3a5c 0%, #1e4d72 55%, #1a5c6a 100%);
           border-radius: 20px 20px 0 0;
@@ -155,11 +342,7 @@ export default function DeveloperSettingsPage() {
           letter-spacing: .08em;
           text-transform: uppercase;
         }
-        .role-dot {
-          width: 5px; height: 5px;
-          border-radius: 50%;
-          background: var(--teal);
-        }
+        .role-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--teal); }
         .status-wrap { margin-left: auto; position: relative; z-index: 1; }
         .status-pill {
           font-size: .7rem;
@@ -170,18 +353,9 @@ export default function DeveloperSettingsPage() {
           align-items: center;
           gap: 5px;
         }
-        .s-active {
-          background: rgba(79,209,197,.22);
-          border: 1px solid rgba(79,209,197,.38);
-          color: #81e6d9;
-        }
-        .s-inactive {
-          background: rgba(245,101,101,.18);
-          border: 1px solid rgba(245,101,101,.3);
-          color: #feb2b2;
-        }
+        .s-active  { background: rgba(79,209,197,.22); border: 1px solid rgba(79,209,197,.38); color: #81e6d9; }
+        .s-inactive{ background: rgba(245,101,101,.18); border: 1px solid rgba(245,101,101,.3);  color: #feb2b2; }
 
-        /* White body under strip — uses global .card border-radius only on bottom */
         .profile-body {
           background: #fff;
           border: 1px solid #EDF2F7;
@@ -191,7 +365,6 @@ export default function DeveloperSettingsPage() {
           box-shadow: 0 4px 20px rgba(0,0,0,.04);
         }
 
-        /* ── Info rows ── */
         .info-row {
           display: flex;
           align-items: center;
@@ -214,7 +387,6 @@ export default function DeveloperSettingsPage() {
           font-family: 'DM Mono', monospace;
         }
 
-        /* ── Sub-card header ── */
         .card-head {
           padding: 1.2rem 1.5rem .9rem;
           display: flex;
@@ -236,7 +408,6 @@ export default function DeveloperSettingsPage() {
           color: #718096;
         }
 
-        /* ── List rows (org + security) ── */
         .list-body { padding: .1rem 1.5rem .9rem; }
         .list-row {
           display: flex;
@@ -260,11 +431,7 @@ export default function DeveloperSettingsPage() {
           font-family: 'DM Mono', monospace;
         }
 
-        /* ── Org empty state ── */
-        .org-empty {
-          padding: 1.5rem 1.5rem 1.2rem;
-          text-align: center;
-        }
+        .org-empty { padding: 1.5rem 1.5rem 1.2rem; text-align: center; }
         .org-empty-icon {
           width: 44px; height: 44px;
           border-radius: 11px;
@@ -276,23 +443,42 @@ export default function DeveloperSettingsPage() {
         .org-empty-title { font-size: .87rem; font-weight: 700; color: #718096; margin-bottom: .3rem; }
         .org-empty-desc  { font-size: .74rem; color: #A0AEC0; line-height: 1.65; max-width: 200px; margin: 0 auto; }
 
-        /* ── Security ── */
-        .sec-label { font-size: .85rem; font-weight: 700; color: #2D3748; margin-bottom: .16rem; }
-        .sec-sub   { font-size: .7rem; color: #A0AEC0; font-family: 'DM Mono', monospace; }
-        .soon-pill {
-          font-size: .63rem;
-          font-weight: 800;
-          letter-spacing: .1em;
-          text-transform: uppercase;
-          background: #F7FAFC;
-          border: 1.5px solid #E2E8F0;
-          color: #A0AEC0;
-          padding: .32rem .85rem;
-          border-radius: 7px;
-          white-space: nowrap;
+        /* ── Security action rows ── */
+        .sec-label { font-size: .82rem; font-weight: 700; color: #2D3748; margin: 0 0 .18rem; }
+        .sec-sub   { font-size: .68rem; color: #A0AEC0; margin: 0; line-height: 1.4; }
+        .sec-row-inner {
+          display: flex;
+          flex-direction: column;
+          gap: .75rem;
+          padding: 1rem 0;
+          border-bottom: 1px solid #EDF2F7;
         }
+        .sec-row-inner:last-child { border-bottom: none; }
+        .sec-row-top {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .sbtn {
+          align-self: flex-start;
+          margin-left: 44px;
+          padding: 6px 14px;
+          border-radius: 8px;
+          border: 1.5px solid;
+          font-size: .72rem;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all .15s;
+          font-family: 'DM Sans', sans-serif;
+          white-space: nowrap;
+          background: transparent;
+        }
+        .sbtn-p { border-color: #0d9488; color: #0d9488; }
+        .sbtn-p:hover { background: #0d9488; color: white; }
+        .sbtn-d { border-color: #ef4444; color: #ef4444; }
+        .sbtn-d:hover { background: #ef4444; color: white; }
 
-        /* ── Access banner (full width) ── */
+        /* ── Access banner ── */
         .access-banner {
           grid-column: 1 / -1;
           border-radius: 16px;
@@ -316,8 +502,7 @@ export default function DeveloperSettingsPage() {
         .a-title-warn { font-size: .82rem; font-weight: 800; color: #C05621; margin-bottom: .15rem; }
         .a-desc { font-size: .74rem; color: #4A5568; line-height: 1.5; }
 
-        /* ── Spinner ── */
-        .spinner-wrap { display:flex; align-items:center; justify-content:center; height:300px; }
+        .spinner-wrap { display: flex; align-items: center; justify-content: center; height: 300px; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .spinner {
           width: 30px; height: 30px;
@@ -330,7 +515,6 @@ export default function DeveloperSettingsPage() {
 
       <div className="sp-page">
 
-        {/* Page heading — no banner, just clean header */}
         <div className="sp-heading animate-fade-in">
           <div className="sp-eyebrow">Account</div>
           <h1 className="sp-title">Settings</h1>
@@ -345,7 +529,6 @@ export default function DeveloperSettingsPage() {
 
             {/* ── Profile card (full width) ── */}
             <div className="sp-full animate-fade-in">
-              {/* Dark navy strip */}
               <div className="profile-strip">
                 <div className="p-avatar">{initials}</div>
                 <div className="p-meta">
@@ -361,7 +544,6 @@ export default function DeveloperSettingsPage() {
                   </span>
                 </div>
               </div>
-              {/* White rows below */}
               <div className="profile-body">
                 <div className="info-row">
                   <span className="info-label">Email</span>
@@ -433,19 +615,36 @@ export default function DeveloperSettingsPage() {
                 <span className="card-title">Security</span>
               </div>
               <div className="list-body">
-                <div className="list-row">
-                  <div>
-                    <p className="sec-label">Password</p>
-                    <p className="sec-sub">••••••••••••</p>
+                {/* Change Password row */}
+                <div className="sec-row-inner">
+                  <div className="sec-row-top">
+                    <div style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(79,209,197,.1)", border: "1px solid rgba(79,209,197,.25)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#319795" strokeWidth={1.75}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="sec-label">Password</p>
+                      <p className="sec-sub">Sends a reset link to your registered email</p>
+                    </div>
                   </div>
-                  <span className="soon-pill">Soon</span>
+                  <button className="sbtn sbtn-p" onClick={() => setModal("password")}>Change password</button>
                 </div>
-                <div className="list-row">
-                  <div>
-                    <p className="sec-label">Two-Factor Auth</p>
-                    <p className="sec-sub">Extra security layer</p>
+
+                {/* Delete Account row */}
+                <div className="sec-row-inner">
+                  <div className="sec-row-top">
+                    <div style={{ width: 34, height: 34, borderRadius: 9, background: "#fef2f2", border: "1px solid #fecaca", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={1.75}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="sec-label">Account deletion</p>
+                      <p className="sec-sub">Permanently deletes your account and all data</p>
+                    </div>
                   </div>
-                  <span className="soon-pill">Soon</span>
+                  <button className="sbtn sbtn-d" onClick={() => setModal("delete")}>Delete account</button>
                 </div>
               </div>
             </div>
@@ -479,6 +678,13 @@ export default function DeveloperSettingsPage() {
           </div>
         )}
       </div>
+
+      {modal === "password" && profile && (
+        <ChangePasswordModal userEmail={profile.email} onClose={() => setModal(null)} />
+      )}
+      {modal === "delete" && (
+        <DeleteAccountModal onClose={() => setModal(null)} />
+      )}
     </DashboardLayout>
   );
 }
