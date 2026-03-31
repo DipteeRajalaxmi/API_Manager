@@ -61,7 +61,10 @@ public class GatewayService {
         if (!"active".equals(sub.getStatus()))
             throw new GatewayAuthException("Subscription is " + sub.getStatus());
 
-         Api api = sub.getApi();
+         if (!"active".equals(sub.getApplication().getDeveloper().getStatus()))
+            throw new GatewayAuthException("Developer account is deactivated");
+
+        Api api = sub.getApi();
         String normalizedPath = "/" + apiPath;
 
         // ── 2.5 Check API blocked ─────────────────────────────────────────────────

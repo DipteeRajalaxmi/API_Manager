@@ -201,7 +201,7 @@ export default function CreateApiPage() {
               </Select>
 
               {/* Rate Limits */}
-              <div>
+              {/* <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-3">
                   Rate Limits <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
@@ -219,7 +219,7 @@ export default function CreateApiPage() {
                     value={form.rateLimitTotal ?? ""}
                     onChange={e => setForm(p => ({ ...p, rateLimitTotal: e.target.value ? Number(e.target.value) : undefined }))} />
                 </div>
-              </div>
+              </div> */}
 
               <div className="bg-teal-50 border border-teal-100 rounded-xl p-4 text-xs text-teal-700 flex gap-2">
                 <span>ℹ</span>

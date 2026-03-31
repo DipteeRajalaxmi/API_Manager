@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/portal")
@@ -80,12 +81,18 @@ public class PortalController {
     }
 
     /** Provider: block or reactivate a subscription (active | blocked) */
+
     @PatchMapping("/provider/subscriptions/{subId}/status")
     public ResponseEntity<SubscriptionResponse> updateSubStatus(
             @PathVariable Long subId,
-            @RequestParam String status,
+            @RequestBody Map<String, String> body,
             HttpServletRequest http) {
-        return ResponseEntity.ok(portalService.updateSubscriptionStatus(subId, status, userId(http)));
+
+        String status = body.get("status");
+
+        return ResponseEntity.ok(
+            portalService.updateSubscriptionStatus(subId, status, userId(http))
+        );
     }
 
    @PostMapping("/provider/grant-access")
@@ -162,6 +169,24 @@ public class PortalController {
             HttpServletRequest http) {
         portalService.removeAllowedDeveloper(apiId, developerId, userId(http));
         return ResponseEntity.noContent().build();
+    }
+
+    /** Provider: deactivate a developer in their org */
+    @PatchMapping("/provider/developers/{developerId}/deactivate")
+    public ResponseEntity<Void> deactivateDeveloper(
+            @PathVariable Long developerId,
+            HttpServletRequest http) {
+        portalService.deactivateDeveloper(developerId, userId(http));
+        return ResponseEntity.ok().build();
+    }
+
+    /** Provider: reactivate a developer in their org */
+    @PatchMapping("/provider/developers/{developerId}/reactivate")
+    public ResponseEntity<Void> reactivateDeveloper(
+            @PathVariable Long developerId,
+            HttpServletRequest http) {
+        portalService.reactivateDeveloper(developerId, userId(http));
+        return ResponseEntity.ok().build();
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────

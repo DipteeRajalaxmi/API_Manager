@@ -142,6 +142,17 @@ export default function DeveloperDetailPage() {
     } finally { setStatusBusy(null); }
   };
 
+  const handleToggleStatus = async () => {
+  const action = dev.status === "active" ? "deactivate" : "reactivate";
+  try {
+    await apiClient.patch(`/api/portal/provider/developers/${devId}/${action}`);
+    show(`Developer ${action}d successfully`);
+    load(logPage);
+  } catch (e: any) {
+    show(e.response?.data?.error || "Failed", "error");
+  }
+};
+
   // ── Grant modal helpers ─────────────────────────────────────────────────────
 
   const openGrantModal = async () => {
@@ -245,6 +256,14 @@ export default function DeveloperDetailPage() {
                 <p className="text-xs text-gray-400">{s.label}</p>
               </div>
             ))}
+            <button
+              onClick={handleToggleStatus}
+              className={`px-4 py-2.5 text-sm font-semibold rounded-xl transition-colors shadow-sm
+                ${dev.status === "active"
+                  ? "bg-red-50 text-red-500 hover:bg-red-100 border border-red-100"
+                  : "bg-green-50 text-green-600 hover:bg-green-100 border border-green-100"}`}>
+              {dev.status === "active" ? "🚫 Deactivate" : "✅ Reactivate"}
+            </button>
             <button
               onClick={openGrantModal}
               className="px-4 py-2.5 bg-teal-500 hover:bg-teal-600 text-white

@@ -197,27 +197,68 @@ public class PortalService {
     }
 
     // Provider: suspend or reactivate a subscription
-    @Transactional
+   @Transactional
     public SubscriptionResponse updateSubscriptionStatus(Long subId, String status, Long providerId) {
         Subscription sub = subscriptionRepo.findById(subId)
             .orElseThrow(() -> new ApiManagerException("Subscription not found"));
 
-        if (!sub.getApi().getCreatedBy().getUserId().equals(providerId))
-            throw new ApiManagerException("Not your API");
+        User provider = getUser(providerId);
 
-        // valid provider-controlled transitions: active ↔ blocked
+        if (!sub.getApi().getOrganization().getOrgId()
+                .equals(provider.getOrganization().getOrgId())) {
+            throw new ApiManagerException("Not your organization API");
+        }
+
         if (!List.of("active", "blocked").contains(status))
             throw new ApiManagerException("Invalid status — use 'active' or 'blocked'");
 
         sub.setStatus(status);
 
-        // also suspend/reactivate the key
         apiKeyRepo.findBySubscription_SubscriptionId(subId).ifPresent(k -> {
             k.setStatus("active".equals(status) ? "active" : "revoked");
             apiKeyRepo.save(k);
         });
 
         return toSubResponse(subscriptionRepo.save(sub));
+    }
+
+
+    // Deactivate a developer (provider action)
+    @Transactional
+    public void deactivateDeveloper(Long developerId, Long providerId) {
+        User provider = getUser(providerId);
+        if (provider.getOrganization() == null)
+            throw new ApiManagerException("You have no organization");
+
+        User developer = getUser(developerId);
+        if (developer.getOrganization() == null ||
+            !developer.getOrganization().getOrgId().equals(provider.getOrganization().getOrgId()))
+            throw new ApiManagerException("Developer does not belong to your organization");
+
+        if ("inactive".equals(developer.getStatus()))
+            throw new ApiManagerException("Developer is already inactive");
+
+        developer.setStatus("inactive");
+        userRepo.save(developer);
+    }
+
+    // Reactivate a developer (provider action)
+    @Transactional
+    public void reactivateDeveloper(Long developerId, Long providerId) {
+        User provider = getUser(providerId);
+        if (provider.getOrganization() == null)
+            throw new ApiManagerException("You have no organization");
+
+        User developer = getUser(developerId);
+        if (developer.getOrganization() == null ||
+            !developer.getOrganization().getOrgId().equals(provider.getOrganization().getOrgId()))
+            throw new ApiManagerException("Developer does not belong to your organization");
+
+        if ("active".equals(developer.getStatus()))
+            throw new ApiManagerException("Developer is already active");
+
+        developer.setStatus("active");
+        userRepo.save(developer);
     }
 
     @Transactional
