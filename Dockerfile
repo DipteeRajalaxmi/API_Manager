@@ -1,14 +1,22 @@
-# Use Java 17
-FROM eclipse-temurin:17-jdk-jammy
+# Stage 1: Build JAR using Maven
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 
-# Set working directory
 WORKDIR /app
 
-# Copy jar from backend folder
-COPY backend/api-manager/target/api-manager-1.0.0.jar app.jar
+# Copy backend project
+COPY backend/api-manager /app
 
-# Expose port (Render will override with PORT)
+# Build jar
+RUN mvn clean install -DskipTests
+
+# Stage 2: Run app
+FROM eclipse-temurin:17-jdk-jammy
+
+WORKDIR /app
+
+# Copy jar from build stage
+COPY --from=build /app/target/api-manager-1.0.0.jar app.jar
+
 EXPOSE 8080
 
-# Run application
 ENTRYPOINT ["java", "-jar", "app.jar"]
