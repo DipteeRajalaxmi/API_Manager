@@ -11,7 +11,8 @@ import com.apimanager.portal.repository.*;
 import com.apimanager.registry.entity.Api;
 import com.apimanager.registry.repository.ApiRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+// import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +40,8 @@ public class PortalService {
     private final UserRepository                 userRepo;
     private final OrganizationRepository         orgRepo;
     private final ApiRepository                  apiRepo;
-    private final BCryptPasswordEncoder          passwordEncoder;
+    // private final BCryptPasswordEncoder          passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
     private final SubscriptionEndpointPermissionRepository permissionRepo;
     private final ApiEndpointRepository endpointRepo;
 
