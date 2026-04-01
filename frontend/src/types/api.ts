@@ -45,6 +45,7 @@ export interface ApiDocument {
   title: string;
   docType: string;
   contentText?: string;
+  content?:string;
   contentUrl?: string;
   createdAt: string;
 }
