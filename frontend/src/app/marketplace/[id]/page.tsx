@@ -246,9 +246,13 @@ export default function MarketplaceDetailPage() {
                   </span>
                   <h4 className="font-semibold text-gray-700 text-sm">{doc.title}</h4>
                 </div>
-                {doc.content && <p className="text-gray-500 text-sm leading-relaxed">{doc.content}</p>}
-                {doc.docUrl && (
-                  <a href={doc.docUrl} target="_blank" rel="noopener noreferrer"
+                {(doc.content || doc.contentText) && (
+                    <p className="text-gray-500 text-sm leading-relaxed">
+                      {doc.content ?? doc.contentText}
+                    </p>
+                  )}
+                {doc.contentUrl && (
+                  <a href={doc.contentUrl} target="_blank" rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-teal-500 text-xs font-semibold mt-2 hover:text-teal-600">
                     View Documentation →
                   </a>
