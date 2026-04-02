@@ -203,6 +203,8 @@ public class AnalyticsController {
             m.put("latency",       log.getLatencyMs());
             m.put("rateLimited",   log.getWasRateLimited());
             m.put("developerName", log.getDeveloper() != null ? log.getDeveloper().getName() : "—");
+            m.put("clientId",   log.getClientId());
+            m.put("clientPlan", log.getClientPlan());
             logs.add(m);
         }
 
@@ -412,6 +414,8 @@ public class AnalyticsController {
             l.put("latency",       log.getLatencyMs());
             l.put("rateLimited",   log.getWasRateLimited());
             l.put("apiName",       log.getApi() != null ? log.getApi().getApiName() : "—");
+            l.put("clientId",   log.getClientId());
+            l.put("clientPlan", log.getClientPlan());
             logs.add(l);
         }
 

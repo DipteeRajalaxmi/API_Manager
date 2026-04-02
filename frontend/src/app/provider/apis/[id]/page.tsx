@@ -21,6 +21,8 @@ import {
 import { UserResponse } from "@/types/auth";
 import { getAllowedDevelopers, addAllowedDeveloper, removeAllowedDeveloper } from "@/lib/portal";
 import apiClient from "@/lib/api";
+import { ApiPlanLimit, PLAN_NAMES, PlanName } from "@/types/api";
+import { getPlanLimits, savePlanLimit, deletePlanLimit } from "@/lib/registry";
 
 type Tab = "endpoints" | "documents" | "versions" | "ratelimits" | "subscribers" | "restricted";
 
@@ -69,6 +71,16 @@ export default function ApiDetailPage() {
   const [blockTarget, setBlockTarget] = useState<"api" | ApiEndpoint | null>(null);
   const [blockSaving, setBlockSaving] = useState(false);
 
+  const [planLimits,    setPlanLimits]    = useState<ApiPlanLimit[]>([]);
+  const [planSaving,    setPlanSaving]    = useState<string | null>(null); // planName being saved
+  const [planDeleting,  setPlanDeleting]  = useState<string | null>(null); // planName being deleted
+  const [newPlanForm,   setNewPlanForm]   = useState({
+    planName: "starter" as PlanName,
+    perMinute: "", perHour: "", perDay: "", total: ""
+  });
+  const [showAddPlan,   setShowAddPlan]   = useState(false);
+  const [rlMode, setRlMode] = useState<"global" | "plan">("global");
+
   const show = (message: string, type: ToastState["type"] = "success") => setToast({ message, type });
 
   const loadAll = useCallback(() => {
@@ -84,6 +96,10 @@ export default function ApiDetailPage() {
     getEndpoints(apiId).then(setEndpoints).catch(() => {});
     getDocuments(apiId).then(setDocuments).catch(() => {});
     getVersions(apiId).then(setVersions).catch(() => {});
+    getPlanLimits(apiId).then(data => {
+    setPlanLimits(data);
+    if (data.length > 0) setRlMode("plan");
+  }).catch(() => {});
   }, [apiId, router]);
 
   const loadSubs = useCallback(() => {
@@ -554,160 +570,368 @@ export default function ApiDetailPage() {
 
         {/* ── Rate Limits ─────────────────────────────────────────────────── */}
         {tab === "ratelimits" && (
-          <div className="animate-fade-in">
-            <h2 className="font-bold text-gray-800 mb-2">Rate Limits</h2>
-            <p className="text-gray-400 text-xs mb-6">
-              Set global limits for the entire API, or fine-tune limits per endpoint.
-              Endpoint limits are checked first — global limits apply as an overall cap.
-            </p>
+        <div className="animate-fade-in">
+          <h2 className="font-bold text-gray-800 mb-2">Rate Limits</h2>
 
-            {/* Global Limits */}
-            <div className="card p-6 mb-5">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-base">🌐</span>
-                <p className="text-sm font-bold text-gray-700">Global API Limits</p>
-                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">Applies to all endpoints combined</span>
+          {/* Mode Toggle */}
+          <div className="flex gap-3 mb-6">
+            <button onClick={() => setRlMode("global")}
+              className={`flex-1 flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-left
+                ${rlMode === "global"
+                  ? "border-teal-400 bg-teal-50"
+                  : "border-gray-200 bg-white hover:border-gray-300"}`}>
+              <div className={`w-4 h-4 rounded-full border-2 mt-0.5 flex-shrink-0 flex items-center justify-center
+                ${rlMode === "global" ? "border-teal-500" : "border-gray-300"}`}>
+                {rlMode === "global" && <div className="w-2 h-2 rounded-full bg-teal-500" />}
               </div>
-
-              {(api.rateLimitPerMinute || api.rateLimitPerHour || api.rateLimitPerDay || api.rateLimitTotal) ? (
-                <div className="grid grid-cols-4 gap-3 mb-5">
-                  {[
-                    { label: "Per Minute", value: api.rateLimitPerMinute, icon: "⚡" },
-                    { label: "Per Hour",   value: api.rateLimitPerHour,   icon: "🕐" },
-                    { label: "Per Day",    value: api.rateLimitPerDay,    icon: "📅" },
-                    { label: "Total",      value: api.rateLimitTotal,     icon: "∞"  },
-                  ].filter(x => x.value).map(x => (
-                    <div key={x.label} className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-100 rounded-xl p-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm">{x.icon}</span>
-                        <span className="text-xs font-semibold text-teal-600">{x.label}</span>
-                      </div>
-                      <p className="text-2xl font-extrabold text-gray-800">{x.value?.toLocaleString()}</p>
-                      <p className="text-xs text-gray-400">calls allowed</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="bg-green-50 border border-green-100 rounded-xl p-3 mb-5 text-sm text-green-600 font-semibold">
-                  ✅ No global limits — unlimited access
-                </div>
-              )}
-
-              <p className="text-xs text-gray-400 mb-4">Leave blank to remove a limit.</p>
-              <div className="grid grid-cols-2 gap-4">
-                <Input label="Per Minute" placeholder="e.g. 60" type="number"
-                  value={rlForm.perMinute} onChange={e => setRlForm(p => ({ ...p, perMinute: e.target.value }))} />
-                <Input label="Per Hour" placeholder="e.g. 1000" type="number"
-                  value={rlForm.perHour} onChange={e => setRlForm(p => ({ ...p, perHour: e.target.value }))} />
-                <Input label="Per Day" placeholder="e.g. 10000" type="number"
-                  value={rlForm.perDay} onChange={e => setRlForm(p => ({ ...p, perDay: e.target.value }))} />
-                <Input label="Total (lifetime)" placeholder="e.g. 100000" type="number"
-                  value={rlForm.total} onChange={e => setRlForm(p => ({ ...p, total: e.target.value }))} />
+              <div>
+                <p className={`text-sm font-bold ${rlMode === "global" ? "text-teal-700" : "text-gray-600"}`}>
+                  🌐 Global Limits
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  One limit for all clients — simple setup
+                </p>
               </div>
-              <Button variant="primary" disabled={rlSaving} className="w-full mt-4"
-                onClick={async () => {
-                  setRlSaving(true);
-                  try {
-                    await updateRateLimits(apiId, {
-                      rateLimitPerMinute: rlForm.perMinute ? Number(rlForm.perMinute) : null,
-                      rateLimitPerHour:   rlForm.perHour   ? Number(rlForm.perHour)   : null,
-                      rateLimitPerDay:    rlForm.perDay     ? Number(rlForm.perDay)    : null,
-                      rateLimitTotal:     rlForm.total      ? Number(rlForm.total)     : null,
-                    });
-                    show("Global rate limits saved");
-                    loadAll();
-                  } catch (e: any) {
-                    show(e.response?.data?.error || "Failed", "error");
-                  } finally { setRlSaving(false); }
-                }}>
-                {rlSaving ? "Saving…" : "Save Global Limits"}
-              </Button>
-            </div>
+            </button>
 
-            {/* Per Endpoint Limits */}
-            <div className="card overflow-hidden">
-              <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-50">
-                <span className="text-base">⚡</span>
-                <p className="text-sm font-bold text-gray-700">Per Endpoint Limits</p>
-                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">Override limits for specific endpoints</span>
+            <button onClick={() => setRlMode("plan")}
+              className={`flex-1 flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-left
+                ${rlMode === "plan"
+                  ? "border-teal-400 bg-teal-50"
+                  : "border-gray-200 bg-white hover:border-gray-300"}`}>
+              <div className={`w-4 h-4 rounded-full border-2 mt-0.5 flex-shrink-0 flex items-center justify-center
+                ${rlMode === "plan" ? "border-teal-500" : "border-gray-300"}`}>
+                {rlMode === "plan" && <div className="w-2 h-2 rounded-full bg-teal-500" />}
               </div>
-
-              {endpoints.length === 0 ? (
-                <div className="p-10 text-center">
-                  <p className="text-gray-400 text-sm">No endpoints yet.</p>
-                  <button onClick={() => setTab("endpoints")} className="text-teal-500 text-xs font-semibold mt-1">Add endpoints first →</button>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-[80px_1fr_100px_100px_100px_80px_110px] gap-2 px-6 py-2.5 bg-gray-50
-                    text-xs font-bold text-gray-400 uppercase tracking-wider">
-                    <div>Method</div>
-                    <div>Path</div>
-                    <div className="text-center">Per Min</div>
-                    <div className="text-center">Per Hour</div>
-                    <div className="text-center">Per Day</div>
-                    <div className="text-center">Total</div>
-                    <div className="text-right">Action</div>
-                  </div>
-                  <div className="divide-y divide-gray-50">
-                    {endpoints.map(ep => (
-                      <div key={ep.endpointId}
-                        className={`grid grid-cols-[80px_1fr_100px_100px_100px_80px_110px] gap-2 px-6 py-3.5 items-center
-                          ${ep.isBlocked ? "bg-red-50/30" : "hover:bg-gray-50"}`}>
-                        <div><MethodBadge method={ep.httpMethod} /></div>
-                        <div>
-                          <code className="text-xs font-mono text-gray-700 truncate block">{ep.path}</code>
-                          {ep.isBlocked && <span className="text-xs text-red-500 font-semibold">🚫 blocked</span>}
-                        </div>
-                        <div className="text-center">
-                          {ep.rateLimitPerMinute
-                            ? <span className="text-xs bg-teal-50 text-teal-600 border border-teal-100 px-2 py-0.5 rounded-lg font-mono font-bold">{ep.rateLimitPerMinute}</span>
-                            : <span className="text-xs text-gray-300">∞</span>}
-                        </div>
-                        <div className="text-center">
-                          {ep.rateLimitPerHour
-                            ? <span className="text-xs bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-lg font-mono font-bold">{ep.rateLimitPerHour}</span>
-                            : <span className="text-xs text-gray-300">∞</span>}
-                        </div>
-                        <div className="text-center">
-                          {ep.rateLimitPerDay
-                            ? <span className="text-xs bg-purple-50 text-purple-600 border border-purple-100 px-2 py-0.5 rounded-lg font-mono font-bold">{ep.rateLimitPerDay}</span>
-                            : <span className="text-xs text-gray-300">∞</span>}
-                        </div>
-                        <div className="text-center">
-                          {ep.rateLimitTotal
-                            ? <span className="text-xs bg-red-50 text-red-500 border border-red-100 px-2 py-0.5 rounded-lg font-mono font-bold">{ep.rateLimitTotal}</span>
-                            : <span className="text-xs text-gray-300">∞</span>}
-                        </div>
-                        <div className="flex justify-end">
-                          <button onClick={() => {
-                            setEpRlTarget(ep);
-                            setEpRlForm({
-                              perMinute: ep.rateLimitPerMinute?.toString() ?? "",
-                              perHour:   ep.rateLimitPerHour?.toString()   ?? "",
-                              perDay:    ep.rateLimitPerDay?.toString()     ?? "",
-                              total:     ep.rateLimitTotal?.toString()      ?? "",
-                            });
-                            setEpRlModal(true);
-                          }} className="text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap
-                            bg-gray-50 hover:bg-teal-50 text-gray-500 hover:text-teal-600
-                            border border-gray-200 hover:border-teal-200 transition-all">
-                            ✏️ Set Limit
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="px-6 py-3 bg-gray-50 border-t border-gray-100">
-                    <p className="text-xs text-gray-400">
-                      💡 Endpoint limits override global limits for that specific route. Leave unlimited to fall back to global limits.
-                    </p>
-                  </div>
-                </>
-              )}
-            </div>
+              <div>
+                <p className={`text-sm font-bold ${rlMode === "plan" ? "text-teal-700" : "text-gray-600"}`}>
+                  📋 Plan-Based Limits
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Different limits per plan — per client independently
+                </p>
+              </div>
+            </button>
           </div>
+
+
+                {rlMode === "global" && (
+                <>
+                  {/* Global Limits */}
+                  <div className="card p-6 mb-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-base">🌐</span>
+                      <p className="text-sm font-bold text-gray-700">Global API Limits</p>
+                      <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">Applies to all endpoints combined</span>
+                    </div>
+
+                    {(api.rateLimitPerMinute || api.rateLimitPerHour || api.rateLimitPerDay || api.rateLimitTotal) ? (
+                      <div className="grid grid-cols-4 gap-3 mb-5">
+                        {[
+                          { label: "Per Minute", value: api.rateLimitPerMinute, icon: "⚡" },
+                          { label: "Per Hour",   value: api.rateLimitPerHour,   icon: "🕐" },
+                          { label: "Per Day",    value: api.rateLimitPerDay,    icon: "📅" },
+                          { label: "Total",      value: api.rateLimitTotal,     icon: "∞"  },
+                        ].filter(x => x.value).map(x => (
+                          <div key={x.label} className="bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-100 rounded-xl p-4">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm">{x.icon}</span>
+                              <span className="text-xs font-semibold text-teal-600">{x.label}</span>
+                            </div>
+                            <p className="text-2xl font-extrabold text-gray-800">{x.value?.toLocaleString()}</p>
+                            <p className="text-xs text-gray-400">calls allowed</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-green-50 border border-green-100 rounded-xl p-3 mb-5 text-sm text-green-600 font-semibold">
+                        ✅ No global limits — unlimited access
+                      </div>
+                    )}
+
+                    <p className="text-xs text-gray-400 mb-4">Leave blank to remove a limit.</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input label="Per Minute" placeholder="e.g. 60" type="number"
+                        value={rlForm.perMinute} onChange={e => setRlForm(p => ({ ...p, perMinute: e.target.value }))} />
+                      <Input label="Per Hour" placeholder="e.g. 1000" type="number"
+                        value={rlForm.perHour} onChange={e => setRlForm(p => ({ ...p, perHour: e.target.value }))} />
+                      <Input label="Per Day" placeholder="e.g. 10000" type="number"
+                        value={rlForm.perDay} onChange={e => setRlForm(p => ({ ...p, perDay: e.target.value }))} />
+                      <Input label="Total (lifetime)" placeholder="e.g. 100000" type="number"
+                        value={rlForm.total} onChange={e => setRlForm(p => ({ ...p, total: e.target.value }))} />
+                    </div>
+                    <Button variant="primary" disabled={rlSaving} className="w-full mt-4"
+                      onClick={async () => {
+                        setRlSaving(true);
+                        try {
+                          await updateRateLimits(apiId, {
+                            rateLimitPerMinute: rlForm.perMinute ? Number(rlForm.perMinute) : null,
+                            rateLimitPerHour:   rlForm.perHour   ? Number(rlForm.perHour)   : null,
+                            rateLimitPerDay:    rlForm.perDay     ? Number(rlForm.perDay)    : null,
+                            rateLimitTotal:     rlForm.total      ? Number(rlForm.total)     : null,
+                          });
+                          show("Global rate limits saved");
+                          loadAll();
+                        } catch (e: any) {
+                          show(e.response?.data?.error || "Failed", "error");
+                        } finally { setRlSaving(false); }
+                      }}>
+                      {rlSaving ? "Saving…" : "Save Global Limits"}
+                    </Button>
+                  </div>
+
+                  {/* Per Endpoint Limits */}
+                  <div className="card overflow-hidden">
+                    <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-50">
+                      <span className="text-base">⚡</span>
+                      <p className="text-sm font-bold text-gray-700">Per Endpoint Limits</p>
+                      <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">Override limits for specific endpoints</span>
+                    </div>
+
+                    {endpoints.length === 0 ? (
+                      <div className="p-10 text-center">
+                        <p className="text-gray-400 text-sm">No endpoints yet.</p>
+                        <button onClick={() => setTab("endpoints")} className="text-teal-500 text-xs font-semibold mt-1">Add endpoints first →</button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-[80px_1fr_100px_100px_100px_80px_110px] gap-2 px-6 py-2.5 bg-gray-50
+                          text-xs font-bold text-gray-400 uppercase tracking-wider">
+                          <div>Method</div>
+                          <div>Path</div>
+                          <div className="text-center">Per Min</div>
+                          <div className="text-center">Per Hour</div>
+                          <div className="text-center">Per Day</div>
+                          <div className="text-center">Total</div>
+                          <div className="text-right">Action</div>
+                        </div>
+                        <div className="divide-y divide-gray-50">
+                          {endpoints.map(ep => (
+                            <div key={ep.endpointId}
+                              className={`grid grid-cols-[80px_1fr_100px_100px_100px_80px_110px] gap-2 px-6 py-3.5 items-center
+                                ${ep.isBlocked ? "bg-red-50/30" : "hover:bg-gray-50"}`}>
+                              <div><MethodBadge method={ep.httpMethod} /></div>
+                              <div>
+                                <code className="text-xs font-mono text-gray-700 truncate block">{ep.path}</code>
+                                {ep.isBlocked && <span className="text-xs text-red-500 font-semibold">🚫 blocked</span>}
+                              </div>
+                              <div className="text-center">
+                                {ep.rateLimitPerMinute
+                                  ? <span className="text-xs bg-teal-50 text-teal-600 border border-teal-100 px-2 py-0.5 rounded-lg font-mono font-bold">{ep.rateLimitPerMinute}</span>
+                                  : <span className="text-xs text-gray-300">∞</span>}
+                              </div>
+                              <div className="text-center">
+                                {ep.rateLimitPerHour
+                                  ? <span className="text-xs bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-lg font-mono font-bold">{ep.rateLimitPerHour}</span>
+                                  : <span className="text-xs text-gray-300">∞</span>}
+                              </div>
+                              <div className="text-center">
+                                {ep.rateLimitPerDay
+                                  ? <span className="text-xs bg-purple-50 text-purple-600 border border-purple-100 px-2 py-0.5 rounded-lg font-mono font-bold">{ep.rateLimitPerDay}</span>
+                                  : <span className="text-xs text-gray-300">∞</span>}
+                              </div>
+                              <div className="text-center">
+                                {ep.rateLimitTotal
+                                  ? <span className="text-xs bg-red-50 text-red-500 border border-red-100 px-2 py-0.5 rounded-lg font-mono font-bold">{ep.rateLimitTotal}</span>
+                                  : <span className="text-xs text-gray-300">∞</span>}
+                              </div>
+                              <div className="flex justify-end">
+                                <button onClick={() => {
+                                  setEpRlTarget(ep);
+                                  setEpRlForm({
+                                    perMinute: ep.rateLimitPerMinute?.toString() ?? "",
+                                    perHour:   ep.rateLimitPerHour?.toString()   ?? "",
+                                    perDay:    ep.rateLimitPerDay?.toString()     ?? "",
+                                    total:     ep.rateLimitTotal?.toString()      ?? "",
+                                  });
+                                  setEpRlModal(true);
+                                }} className="text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap
+                                  bg-gray-50 hover:bg-teal-50 text-gray-500 hover:text-teal-600
+                                  border border-gray-200 hover:border-teal-200 transition-all">
+                                  ✏️ Set Limit
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100">
+                          <p className="text-xs text-gray-400">
+                            💡 Endpoint limits override global limits for that specific route. Leave unlimited to fall back to global limits.
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                    </>
+                  )}
+
+
+     {rlMode === "plan" && (
+  <div className="card overflow-hidden">
+    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
+      <div className="flex items-center gap-2">
+        <span className="text-base">📋</span>
+        <p className="text-sm font-bold text-gray-700">Plan-Based Rate Limits</p>
+        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">
+          Optional — per client plan
+        </span>
+      </div>
+      <button onClick={() => setShowAddPlan(p => !p)}
+        className="text-xs font-semibold px-3 py-1.5 grad-teal text-white rounded-lg hover:opacity-90 transition-all">
+        {showAddPlan ? "✕ Cancel" : "+ Add Plan"}
+      </button>
+    </div>
+
+    <div className="mx-6 mt-4 bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
+      💡 When any request sends <code className="bg-white px-1 rounded">X-Client-Plan: professional</code> in the request,
+      the gateway will apply that plan's limits <strong>per client</strong> independently.
+      Leave empty to fall back to global limits.
+    </div>
+
+    {showAddPlan && (
+      <div className="mx-6 mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4">
+        <p className="text-xs font-bold text-gray-600 mb-3 uppercase tracking-wider">New Plan Limit</p>
+        <div className="grid grid-cols-5 gap-3 items-end">
+          <div>
+            <label className="text-xs font-semibold text-gray-500 block mb-1.5">Plan</label>
+            <select value={newPlanForm.planName}
+              onChange={e => setNewPlanForm(p => ({ ...p, planName: e.target.value as PlanName }))}
+              className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700
+                focus:outline-none focus:border-teal-300 transition-all capitalize">
+              {PLAN_NAMES.filter(p =>
+                !planLimits.find(pl => pl.planName.toLowerCase() === p.toLowerCase())
+              ).map(p => (
+                <option key={p} value={p} className="capitalize">{p}</option>
+              ))}
+            </select>
+          </div>
+          <Input label="Per Minute" placeholder="e.g. 20" type="number"
+            value={newPlanForm.perMinute}
+            onChange={e => setNewPlanForm(p => ({ ...p, perMinute: e.target.value }))} />
+          <Input label="Per Hour" placeholder="e.g. 500" type="number"
+            value={newPlanForm.perHour}
+            onChange={e => setNewPlanForm(p => ({ ...p, perHour: e.target.value }))} />
+          <Input label="Per Day" placeholder="e.g. 2000" type="number"
+            value={newPlanForm.perDay}
+            onChange={e => setNewPlanForm(p => ({ ...p, perDay: e.target.value }))} />
+          <Input label="Total" placeholder="e.g. 10000" type="number"
+            value={newPlanForm.total}
+            onChange={e => setNewPlanForm(p => ({ ...p, total: e.target.value }))} />
+        </div>
+        <button
+          onClick={async () => {
+            setPlanSaving(newPlanForm.planName);
+            try {
+              await savePlanLimit(apiId, {
+                planName: newPlanForm.planName,
+                rateLimitPerMinute: newPlanForm.perMinute ? Number(newPlanForm.perMinute) : null,
+                rateLimitPerHour:   newPlanForm.perHour   ? Number(newPlanForm.perHour)   : null,
+                rateLimitPerDay:    newPlanForm.perDay     ? Number(newPlanForm.perDay)    : null,
+                rateLimitTotal:     newPlanForm.total      ? Number(newPlanForm.total)     : null,
+              });
+              show(`Plan limit saved for ${newPlanForm.planName}`);
+              setShowAddPlan(false);
+              setNewPlanForm({ planName: "starter", perMinute: "", perHour: "", perDay: "", total: "" });
+              getPlanLimits(apiId).then(setPlanLimits);
+            } catch (e: any) {
+              show(e.response?.data?.error || "Failed", "error");
+            } finally { setPlanSaving(null); }
+          }}
+          disabled={!!planSaving}
+          className="mt-3 grad-teal text-white text-xs font-semibold px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50 transition-all">
+          {planSaving ? "Saving…" : "Save Plan Limit"}
+        </button>
+      </div>
+    )}
+
+    {planLimits.length === 0 && !showAddPlan ? (
+      <div className="p-10 text-center">
+        <p className="text-gray-400 text-sm">No plan limits configured</p>
+        <p className="text-gray-300 text-xs mt-1">Click "+ Add Plan" to define limits per plan</p>
+      </div>
+    ) : planLimits.length > 0 && (
+      <>
+        <div className="grid grid-cols-[140px_1fr_100px_100px_100px_80px_80px] gap-2 px-6 py-2.5 mt-4
+          bg-gray-50 text-xs font-bold text-gray-400 uppercase tracking-wider">
+          <div>Plan</div>
+          <div />
+          <div className="text-center">Per Min</div>
+          <div className="text-center">Per Hour</div>
+          <div className="text-center">Per Day</div>
+          <div className="text-center">Total</div>
+          <div className="text-right">Action</div>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {planLimits.map(pl => (
+            <div key={pl.planName}
+              className="grid grid-cols-[140px_1fr_100px_100px_100px_80px_80px] gap-2 px-6 py-3.5 items-center hover:bg-gray-50">
+              <div>
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg capitalize
+                  ${pl.planName === "enterprise"   ? "bg-purple-50 text-purple-600 border border-purple-100" :
+                    pl.planName === "business"     ? "bg-blue-50 text-blue-600 border border-blue-100"       :
+                    pl.planName === "professional" ? "bg-teal-50 text-teal-600 border border-teal-100"       :
+                                                     "bg-gray-100 text-gray-500 border border-gray-200"}`}>
+                  {pl.planName}
+                </span>
+              </div>
+              <div />
+              <div className="text-center">
+                {pl.rateLimitPerMinute
+                  ? <span className="text-xs bg-teal-50 text-teal-600 border border-teal-100 px-2 py-0.5 rounded-lg font-mono font-bold">{pl.rateLimitPerMinute}</span>
+                  : <span className="text-xs text-gray-300">∞</span>}
+              </div>
+              <div className="text-center">
+                {pl.rateLimitPerHour
+                  ? <span className="text-xs bg-blue-50 text-blue-600 border border-blue-100 px-2 py-0.5 rounded-lg font-mono font-bold">{pl.rateLimitPerHour}</span>
+                  : <span className="text-xs text-gray-300">∞</span>}
+              </div>
+              <div className="text-center">
+                {pl.rateLimitPerDay
+                  ? <span className="text-xs bg-purple-50 text-purple-600 border border-purple-100 px-2 py-0.5 rounded-lg font-mono font-bold">{pl.rateLimitPerDay}</span>
+                  : <span className="text-xs text-gray-300">∞</span>}
+              </div>
+              <div className="text-center">
+                {pl.rateLimitTotal
+                  ? <span className="text-xs bg-red-50 text-red-500 border border-red-100 px-2 py-0.5 rounded-lg font-mono font-bold">{pl.rateLimitTotal}</span>
+                  : <span className="text-xs text-gray-300">∞</span>}
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={async () => {
+                    setPlanDeleting(pl.planName);
+                    try {
+                      await deletePlanLimit(apiId, pl.planName);
+                      show(`${pl.planName} plan limit removed`);
+                      getPlanLimits(apiId).then(setPlanLimits);
+                    } catch (e: any) {
+                      show(e.response?.data?.error || "Failed", "error");
+                    } finally { setPlanDeleting(null); }
+                  }}
+                  disabled={planDeleting === pl.planName}
+                  className="text-xs px-2.5 py-1.5 bg-red-50 text-red-400 hover:bg-red-100
+                    rounded-lg transition-all disabled:opacity-50 font-semibold">
+                  {planDeleting === pl.planName ? "…" : "✕"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100">
+          <p className="text-xs text-gray-400">
+            💡 Gateway checks <code className="bg-white px-1 rounded">X-Client-Plan</code> header →
+            applies matching plan limit per <code className="bg-white px-1 rounded">X-Client-Id</code> independently.
+            Falls back to global limits if no plan header sent.
+          </p>
+        </div>
+      </>
+    )}
+  </div>
+)}
+        </div>
         )}
+
+
 
         {/* ── Access Control ──────────────────────────────────────────────── */}
         {tab === "restricted" && (

@@ -6,7 +6,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import apiClient from "@/lib/api";
 
 interface DevStat  { userId: number; name: string; calls: number; lastCall: string; }
-interface RecentLog { requestTime: string; method: string; path: string; status: number; latency: number; rateLimited: boolean; developerName: string; }
+interface RecentLog { requestTime: string; method: string; path: string; status: number; latency: number; rateLimited: boolean; developerName: string; clientId?: string; clientPlan?: string; }
 interface ApiDetailAnalytics { developers: DevStat[]; recentLogs: RecentLog[]; }
 
 function statusMeaning(s: number) {
@@ -389,7 +389,7 @@ export default function ApiAnalyticsDetailPage() {
                   <thead>
                     <tr>
                       <th>Time</th><th>Method</th><th>Path</th>
-                      <th>Status</th><th>Meaning</th><th>Latency</th><th>Developer</th>
+                      <th>Status</th><th>Meaning</th><th>Latency</th><th>Developer</th><th>Client</th><th>Plan</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -420,6 +420,22 @@ export default function ApiAnalyticsDetailPage() {
                               <span className="dc-d"/>
                               {log.developerName || "—"}
                             </span>
+                          </td>
+
+                          <td className="c-mng">{log.clientId || "—"}</td>
+                          <td>
+                            {log.clientPlan ? (
+                              <span style={{
+                                fontSize:".68rem", fontWeight:700, padding:".17rem .46rem",
+                                borderRadius:".38rem", textTransform:"capitalize",
+                                background: log.clientPlan === "enterprise" ? "#f5f3ff" :
+                                            log.clientPlan === "business"   ? "#eff6ff" :
+                                            log.clientPlan === "professional" ? "#f0fdfa" : "#f8fafc",
+                                color: log.clientPlan === "enterprise" ? "#7c3aed" :
+                                      log.clientPlan === "business"   ? "#1d4ed8" :
+                                      log.clientPlan === "professional" ? "#0f766e" : "#475569",
+                              }}>{log.clientPlan}</span>
+                            ) : <span style={{color:"var(--s300)"}}>—</span>}
                           </td>
                         </tr>
                       );

@@ -241,4 +241,18 @@ public interface ApiUsageLogRepository extends JpaRepository<ApiUsageLog, Long> 
 
       
 
+       // ── Per-client rate limit counters (plan-based)
+
+       @Query("SELECT COUNT(l) FROM ApiUsageLog l " +
+              "WHERE l.trackingKey = :trackingKey " +
+              "AND l.requestTime >= :since " +
+              "AND l.wasRateLimited = false")
+       long countCallsSinceByTrackingKey(@Param("trackingKey") String trackingKey,
+                                          @Param("since") LocalDateTime since);
+
+       @Query("SELECT COUNT(l) FROM ApiUsageLog l " +
+              "WHERE l.trackingKey = :trackingKey " +
+              "AND l.wasRateLimited = false")
+       long countTotalCallsByTrackingKey(@Param("trackingKey") String trackingKey);
+
 }

@@ -73,5 +73,14 @@ public class ApiUsageLog {
     @JoinColumn(name = "endpoint_id")
     private ApiEndpoint endpoint;
 
+    @Column(name = "client_id")
+    private String clientId;
+
+    @Column(name = "client_plan")
+    private String clientPlan;
+
+    @Column(name = "tracking_key")
+    private String trackingKey;
+
    
 }

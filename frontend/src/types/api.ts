@@ -141,3 +141,15 @@ export interface CreateApplicationRequest {
   appName: string;
   description?: string;
 }
+
+export interface ApiPlanLimit {
+  id?: number;
+  planName: string;
+  rateLimitPerMinute?: number | null;
+  rateLimitPerHour?: number | null;
+  rateLimitPerDay?: number | null;
+  rateLimitTotal?: number | null;
+}
+
+export const PLAN_NAMES = ["starter", "professional", "business", "enterprise"] as const;
+export type PlanName = typeof PLAN_NAMES[number];

@@ -6,6 +6,8 @@ import com.apimanager.portal.entity.ApiUsageLog;
 import com.apimanager.portal.entity.Subscription;
 import com.apimanager.portal.repository.ApiKeyRepository;
 import com.apimanager.portal.repository.ApiUsageLogRepository;
+import com.apimanager.registry.repository.ApiPlanLimitRepository;
+import com.apimanager.registry.entity.ApiPlanLimit;
 import com.apimanager.registry.entity.Api;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,7 @@ public class GatewayService {
     private final ApiUsageLogRepository usageLogRepo;
     private final RestTemplate        restTemplate;
     private final SubscriptionEndpointPermissionRepository permissionRepo;
+    private final ApiPlanLimitRepository apiPlanLimitRepo;
 
     private final java.util.concurrent.ConcurrentHashMap<Long, CircuitBreakerState> circuitBreakers
     = new java.util.concurrent.ConcurrentHashMap<>();
@@ -53,9 +56,16 @@ public class GatewayService {
         if (!"active".equals(apiKey.getStatus()))
             throw new GatewayAuthException("API key is revoked or expired");
  
-        Subscription sub = apiKey.getSubscription();
+       Subscription sub = apiKey.getSubscription();
         if (sub == null)
             throw new GatewayAuthException("No subscription linked to this key");
+
+        // ── Extract plan-based client headers ────────────────────────────────────
+        String clientId   = request.getHeader("X-Client-Id");
+        String clientPlan = request.getHeader("X-Client-Plan");
+        String trackingKey = (clientId != null && !clientId.isBlank())
+                ? sub.getSubscriptionId() + ":" + clientId
+                : sub.getSubscriptionId().toString();
  
         // ── 2. Check subscription status ─────────────────────────────────────
         if (!"active".equals(sub.getStatus()))
@@ -70,7 +80,8 @@ public class GatewayService {
         // ── 2.5 Check API blocked ─────────────────────────────────────────────────
         if (Boolean.TRUE.equals(api.getIsBlocked())) {
             logCall(apiKey, sub, null, apiPath, method.name(), request,
-                    503L, System.currentTimeMillis() - startMs, false, null);
+            503L, System.currentTimeMillis() - startMs, false, null,
+            clientId, clientPlan, trackingKey);
             throw new ServiceBlockedException(
                     "API is temporarily unavailable",
                     api.getBlockedReason() != null ? api.getBlockedReason() : "This API has been blocked by the provider"
@@ -84,7 +95,7 @@ public class GatewayService {
         // ── 3.1 Check endpoint blocked ────────────────────────────────────────────
     if (matchedEndpoint != null && Boolean.TRUE.equals(matchedEndpoint.getIsBlocked())) {
         logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
-                503L, System.currentTimeMillis() - startMs, false, null);
+                503L, System.currentTimeMillis() - startMs, false, null,clientId, clientPlan, trackingKey);
         throw new ServiceBlockedException(
                 "Endpoint is temporarily unavailable",
                 matchedEndpoint.getBlockedReason() != null ? matchedEndpoint.getBlockedReason() : "This endpoint has been blocked by the provider"
@@ -101,7 +112,7 @@ public class GatewayService {
                         sub.getSubscriptionId(), matchedEndpoint.getEndpointId());
             if (!isAllowed) {
                 logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
-                        403L, System.currentTimeMillis() - startMs, false, null);
+                        403L, System.currentTimeMillis() - startMs, false, null,clientId, clientPlan, trackingKey);
                 throw new EndpointNotPermittedException(
                     "You do not have access to this endpoint");
             }
@@ -116,17 +127,17 @@ public class GatewayService {
             if (epRl.exceeded) {
                 logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
                         429L, System.currentTimeMillis() - startMs, true,
-                        "ENDPOINT_" + epRl.limitType);
+                        "ENDPOINT_" + epRl.limitType,clientId, clientPlan, trackingKey);
                 throw new RateLimitException(
                         "ENDPOINT_" + epRl.limitType, epRl.limit, epRl.retryAfterSeconds);
             }
         }
 
         // 3c. Check API-level rate limits
-        RateLimitResult rl = checkRateLimits(sub.getSubscriptionId(), api);
+        RateLimitResult rl = checkRateLimitsWithPlan(trackingKey, api, clientPlan);
         if (rl.exceeded) {
             logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
-                    429L, System.currentTimeMillis() - startMs, true, rl.limitType);
+                    429L, System.currentTimeMillis() - startMs, true, rl.limitType,clientId, clientPlan, trackingKey);
             throw new RateLimitException(rl.limitType, rl.limit, rl.retryAfterSeconds);
         }
 
@@ -135,7 +146,7 @@ public class GatewayService {
         CircuitBreakerState circuit = circuitBreakers.computeIfAbsent(apiId, k -> new CircuitBreakerState());
         if (circuit.isOpen()) {
             logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
-                    503L, System.currentTimeMillis() - startMs, false, null);
+                    503L, System.currentTimeMillis() - startMs, false, null,clientId, clientPlan, trackingKey);
             throw new CircuitOpenException("Circuit open for API: " + api.getApiName());
         }
  
@@ -153,21 +164,21 @@ public class GatewayService {
             log.error("Gateway upstream unreachable: {}", e.getMessage());
             circuit.recordFailure();
             logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
-                502L, System.currentTimeMillis() - startMs, false, null);
+                502L, System.currentTimeMillis() - startMs, false, null,clientId, clientPlan, trackingKey);
             throw new UpstreamUnavailableException("Upstream unreachable: " + targetUrl, e.getMessage());
 
         } catch (org.springframework.web.client.HttpStatusCodeException e) {
             log.error("Gateway upstream returned error: {}", e.getStatusCode());
             circuit.recordSuccess();
             logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
-                (long) e.getStatusCode().value(), System.currentTimeMillis() - startMs, false, null);
+                (long) e.getStatusCode().value(), System.currentTimeMillis() - startMs, false, null,clientId, clientPlan, trackingKey);
             throw new UpstreamUnavailableException("Upstream error " + e.getStatusCode(), e.getMessage());
 
         } catch (Exception e) {
             log.error("Gateway upstream error: {}", e.getMessage());
             circuit.recordFailure();
             logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
-                502L, System.currentTimeMillis() - startMs, false, null);
+                502L, System.currentTimeMillis() - startMs, false, null,clientId, clientPlan, trackingKey);
             throw new ApiManagerException("Upstream service error: " + e.getMessage());
         }
  
@@ -175,7 +186,7 @@ public class GatewayService {
  
         // ── 5. Log successful call ────────────────────────────────────────────
         logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
-            (long) upstream.getStatusCode().value(), latency, false, null);
+            (long) upstream.getStatusCode().value(), latency, false, null,clientId, clientPlan, trackingKey);
         
  
         // ── 6. Update key last_used_at ────────────────────────────────────────
@@ -220,6 +231,52 @@ public class GatewayService {
  
         return RateLimitResult.ok();
     }
+
+    private RateLimitResult checkRateLimitsWithPlan(
+        String trackingKey, Api api, String clientPlan) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // If plan header provided, look up plan limits
+        if (clientPlan != null && !clientPlan.isBlank()) {
+            ApiPlanLimit planLimit = apiPlanLimitRepo
+                    .findByApi_ApiIdAndPlanName(api.getApiId(), clientPlan)
+                    .orElse(null);
+
+            if (planLimit != null) {
+                if (planLimit.getRateLimitPerMinute() != null) {
+                    long used = usageLogRepo.countCallsSinceByTrackingKey(
+                            trackingKey, now.minusMinutes(1));
+                    if (used >= planLimit.getRateLimitPerMinute())
+                        return RateLimitResult.exceeded(
+                                "PLAN_PER_MINUTE", planLimit.getRateLimitPerMinute(), 60);
+                }
+                if (planLimit.getRateLimitPerHour() != null) {
+                    long used = usageLogRepo.countCallsSinceByTrackingKey(
+                            trackingKey, now.minusHours(1));
+                    if (used >= planLimit.getRateLimitPerHour())
+                        return RateLimitResult.exceeded(
+                                "PLAN_PER_HOUR", planLimit.getRateLimitPerHour(), 3600);
+                }
+                if (planLimit.getRateLimitPerDay() != null) {
+                    long used = usageLogRepo.countCallsSinceByTrackingKey(
+                            trackingKey, now.minusDays(1));
+                    if (used >= planLimit.getRateLimitPerDay())
+                        return RateLimitResult.exceeded(
+                                "PLAN_PER_DAY", planLimit.getRateLimitPerDay(), 86400);
+                }
+                if (planLimit.getRateLimitTotal() != null) {
+                    long used = usageLogRepo.countTotalCallsByTrackingKey(trackingKey);
+                    if (used >= planLimit.getRateLimitTotal())
+                        return RateLimitResult.exceeded(
+                                "PLAN_TOTAL", planLimit.getRateLimitTotal(), 0);
+                }
+                return RateLimitResult.ok();
+            }
+        }
+
+    // Fallback → existing API-level limits (unchanged)
+    return checkRateLimits(Long.parseLong(trackingKey.split(":")[0]), api);
+}
  
     private RateLimitHeaders buildRateLimitHeaders(
         Long subId, Api api, ApiEndpoint endpoint, String path) {
@@ -305,9 +362,10 @@ public class GatewayService {
     }
  
         private void logCall(ApiKey apiKey, Subscription sub, ApiEndpoint endpoint,
-                     String path, String method, HttpServletRequest request,
-                         Long status, Long latency,
-                         boolean rateLimited, String rateLimitType) {
+             String path, String method, HttpServletRequest request,
+                 Long status, Long latency,
+                 boolean rateLimited, String rateLimitType,
+                 String clientId, String clientPlan, String trackingKey) {
         try {
             ApiUsageLog usageLog = new ApiUsageLog();
                 usageLog.setApi(sub.getApi());
@@ -322,6 +380,9 @@ public class GatewayService {
                 usageLog.setUserAgent(request.getHeader("User-Agent"));
                 usageLog.setWasRateLimited(rateLimited);
                 usageLog.setRateLimitType(rateLimitType);
+                usageLog.setClientId(clientId);
+                usageLog.setClientPlan(clientPlan);
+                usageLog.setTrackingKey(trackingKey);
                 usageLog.setRequestTime(LocalDateTime.now());
                 usageLog.setEndpoint(endpoint);
                 usageLogRepo.save(usageLog);

@@ -6,6 +6,7 @@ import {
   CreateEndpointRequest,
   CreateDocumentRequest,
   ApiEndpoint,
+  ApiPlanLimit,
   ApiDocument,
 } from "@/types/api";
 
@@ -184,4 +185,21 @@ export const importSwaggerUrl = async (url: string): Promise<ImportResult> => {
   const res = await api.post<ImportResult>("/api/apis/swagger/import-url", { url });
   return res.data;
 };
+
+// ── Plan Limits ───────────────────────────────────────────────────────────────
+
+export const getPlanLimits = async (apiId: number): Promise<ApiPlanLimit[]> => {
+  const res = await api.get(`/api/registry/apis/${apiId}/plan-limits`);
+  return res.data;
+};
+
+export const savePlanLimit = async (apiId: number, data: ApiPlanLimit): Promise<ApiPlanLimit> => {
+  const res = await api.post(`/api/registry/apis/${apiId}/plan-limits`, data);
+  return res.data;
+};
+
+export const deletePlanLimit = async (apiId: number, planName: string): Promise<void> => {
+  await api.delete(`/api/registry/apis/${apiId}/plan-limits/${planName}`);
+};
+
 
