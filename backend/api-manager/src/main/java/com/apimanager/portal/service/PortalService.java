@@ -44,6 +44,7 @@ public class PortalService {
     private final PasswordEncoder passwordEncoder;
     private final SubscriptionEndpointPermissionRepository permissionRepo;
     private final ApiEndpointRepository endpointRepo;
+    private final com.apimanager.registry.repository.ApiPlanLimitRepository apiPlanLimitRepo;
 
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -531,6 +532,23 @@ public class PortalService {
         // key clientId (masked — not the secret)
         apiKeyRepo.findBySubscription_SubscriptionId(sub.getSubscriptionId())
             .ifPresent(k -> r.setClientId(k.getClientId()));
+
+                // ── Plan limits ───────────────────────────────────────────────
+
+         List<com.apimanager.registry.entity.ApiPlanLimit> plans =
+        apiPlanLimitRepo.findByApi_ApiId(sub.getApi().getApiId());
+
+        if (!plans.isEmpty()) {
+            r.setPlanLimits(plans.stream().map(p -> {
+                java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("planName",           p.getPlanName());
+                m.put("rateLimitPerMinute", p.getRateLimitPerMinute());
+                m.put("rateLimitPerHour",   p.getRateLimitPerHour());
+                m.put("rateLimitPerDay",    p.getRateLimitPerDay());
+                m.put("rateLimitTotal",     p.getRateLimitTotal());
+                return m;
+            }).toList());
+        }
         return r;
     }
 

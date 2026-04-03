@@ -85,11 +85,11 @@ export const getNavItems = (role: string) => {
     case "API_PROVIDER":
       return [
         { href: "/provider/dashboard", icon: "dashboard", label: "Dashboard"   },
-        { href: "/provider/apis",      icon: "apis",      label: "My APIs"     },
-        { href: "/provider/api-requests", icon: "handshake", label: "API Requests" },
-        { href: "/provider/developers", icon: "users", label: "Developers" },
+        { href: "/provider/apis",      icon: "apis",      label: "My APIs"     },    
         { href: "/marketplace",        icon: "market",    label: "Marketplace" },
+        { href: "/provider/developers", icon: "users", label: "Developers" },
         { href: "/provider/analytics", icon: "analytics", label: "Analytics" },
+        { href: "/provider/api-requests", icon: "handshake", label: "API Requests" },
         { href: "/provider/settings", icon: "settings", label: "Settings" }
 
       ];
@@ -100,12 +100,13 @@ export const getNavItems = (role: string) => {
         { href: "/marketplace",          icon: "market",    label: "Marketplace" },
         { href: "/developer/apps",       icon: "apps",      label: "My Apps"     },
         { href: "/developer/analytics",  icon: "analytics", label: "Analytics"   },
-        { href: "/developer/how-to-use", icon: "howtouse",  label: "How to Use"  },
-        { href: "/developer/settings",   icon: "settings",  label: "Settings"    },
+        
         ...(user?.orgId ? [
           { href: "/developer/contribute",  icon: "apis",      label: "Contribute API" },
           { href: "/developer/my-requests", icon: "handshake", label: "My Requests"    },
         ] : []),
+        { href: "/developer/how-to-use", icon: "howtouse",  label: "How to Use"  },
+        { href: "/developer/settings",   icon: "settings",  label: "Settings"    },
       ];
     }
     case "ADMIN":

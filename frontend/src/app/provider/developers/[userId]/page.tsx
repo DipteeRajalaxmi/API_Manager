@@ -10,6 +10,7 @@ import { ToastState } from "@/types/api";
 import apiClient from "@/lib/api";
 import { updateSubscriptionStatus, grantApiAccess } from "@/lib/portal";
 import { getMyApis, getEndpoints } from "@/lib/registry";
+import ClientsTab from "@/components/provider/ClientsTab";
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,8 @@ interface LogEntry {
   latency: number;
   rateLimited: boolean;
   apiName: string;
+  clientId: string | null;   
+  clientPlan: string | null;
 }
 
 interface DevDetail {
@@ -82,7 +85,7 @@ interface DevDetail {
   totalLogs?: number;
 }
 
-type Tab = "subscriptions" | "logs";
+type Tab = "subscriptions" | "logs" | "clients";
 
 // ── Page Component ────────────────────────────────────────────────────────────
 
@@ -278,17 +281,20 @@ export default function DeveloperDetailPage() {
           {[
             { key: "subscriptions", label: "Subscriptions", count: subscriptions.length },
             { key: "logs",          label: "Recent Calls",  count: recentLogs.length    },
-          ].map(t => (
-            <button key={t.key} onClick={() => setTab(t.key as Tab)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all
-                ${tab === t.key ? "bg-white text-teal-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
-              {t.label}
-              <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full
-                ${tab === t.key ? "bg-teal-50 text-teal-500" : "bg-gray-200 text-gray-400"}`}>
-                {t.count}
-              </span>
-            </button>
-          ))}
+            { key: "clients",       label: "Clients",        count: null                },
+            ].map(t => (
+              <button key={t.key} onClick={() => setTab(t.key as Tab)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all
+                  ${tab === t.key ? "bg-white text-teal-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+                {t.label}
+                {t.count !== null && (
+                  <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full
+                    ${tab === t.key ? "bg-teal-50 text-teal-500" : "bg-gray-200 text-gray-400"}`}>
+                    {t.count}
+                  </span>
+                )}
+              </button>
+            ))}
         </div>
 
         {/* ── Subscriptions Tab ───────────────────────────────────────── */}
@@ -443,68 +449,93 @@ export default function DeveloperDetailPage() {
               </div>
             ) : (
               <div className="card overflow-hidden">
-                <div className="grid grid-cols-12 gap-3 px-6 py-3 bg-gray-50 border-b border-gray-100
-                  text-xs font-bold text-gray-400 uppercase tracking-wider">
-                  <div className="col-span-2">Time</div>
-                  <div className="col-span-2">API</div>
-                  <div className="col-span-1">Method</div>
-                  <div className="col-span-2">Path</div>
-                  <div className="col-span-1 text-center">Code</div>
-                  <div className="col-span-2">Result</div>
-                  <div className="col-span-1 text-right">Latency</div>
-                  <div className="col-span-1 text-right">Flag</div>
+                <div className="grid grid-cols-[140px_1fr_80px_1fr_60px_130px_120px_80px_50px] gap-2 px-6 py-3
+                  bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  <div>Time</div>
+                  <div>API</div>
+                  <div>Method</div>
+                  <div>Path</div>
+                  <div className="text-center">Code</div>
+                  <div>Result</div>
+                  <div>Client</div>
+                  <div className="text-right">Latency</div>
+                  <div className="text-right">Flag</div>
                 </div>
 
+
                 <div className="divide-y divide-gray-50">
-                  {recentLogs.map((log, i) => (
-                    <div key={i}
-                      className={`grid grid-cols-12 gap-3 px-6 py-3 items-center text-sm
-                        ${log.rateLimited ? "bg-orange-50/30" : "hover:bg-gray-50"}`}>
-                      <div className="col-span-2">
-                        <span className="text-xs text-gray-400">
-                          {new Date(log.requestTime).toLocaleString("en-IN", {
-                            day: "numeric", month: "short",
-                            hour: "2-digit", minute: "2-digit"
-                          })}
-                        </span>
-                      </div>
-                      <div className="col-span-2">
-                        <span className="text-xs font-semibold text-gray-600 truncate block">{log.apiName}</span>
-                      </div>
-                      <div className="col-span-1"><MethodBadge method={log.method} /></div>
-                      <div className="col-span-2">
-                        <code className="text-xs font-mono text-gray-500 truncate block">{log.path}</code>
-                      </div>
-                      <div className="col-span-1 text-center">
-                        <span className={`text-xs font-bold ${httpStatusColor(log.status)}`}>
-                          {log.status}
-                        </span>
-                      </div>
-                      <div className="col-span-2">
-                        <span className={`text-xs px-2 py-0.5 rounded-lg font-semibold
-                          ${log.status >= 500 ? "bg-red-50 text-red-500" :
-                            log.status >= 400 ? "bg-orange-50 text-orange-500" :
-                            log.status >= 200 && log.status < 300 ? "bg-green-50 text-green-600" :
-                            "bg-gray-100 text-gray-400"}`}>
-                          {log.statusLabel || `HTTP ${log.status}`}
-                        </span>
-                      </div>
-                      <div className="col-span-1 text-right">
-                        <span className={`text-xs font-mono ${log.latency > 1000 ? "text-orange-500" : "text-gray-400"}`}>
-                          {log.latency}ms
-                        </span>
-                      </div>
-                      <div className="col-span-1 text-right">
-                        {log.rateLimited && (
-                          <span className="text-xs bg-orange-50 text-orange-500 border border-orange-100
-                            px-1.5 py-0.5 rounded font-semibold" title={log.rateLimitType ?? "Rate limited"}>
-                            429
-                          </span>
-                        )}
-                      </div>
+                {recentLogs.map((log, i) => (
+                  <div key={i}
+                    className={`grid grid-cols-[140px_1fr_80px_1fr_60px_130px_120px_80px_50px] gap-2 px-6 py-3 items-center text-sm
+                      ${log.rateLimited ? "bg-orange-50/30" : "hover:bg-gray-50"}`}>
+
+                    <div>
+                      <span className="text-xs text-gray-400 whitespace-nowrap">
+                        {new Date(log.requestTime).toLocaleString("en-IN", {
+                          day: "numeric", month: "short",
+                          hour: "2-digit", minute: "2-digit"
+                        })}
+                      </span>
                     </div>
-                  ))}
-                </div>
+
+                   <div className="min-w-0">
+                      <span className="text-xs font-semibold text-gray-600 truncate block">{log.apiName}</span>
+                    </div>
+
+                    <div><MethodBadge method={log.method} /></div>
+
+                    <div className="min-w-0">
+                      <code className="text-xs font-mono text-gray-500 truncate block">{log.path}</code>
+                    </div>
+
+                    <div className="text-center">
+                      <span className={`text-xs font-bold ${httpStatusColor(log.status)}`}>
+                        {log.status}
+                      </span>
+                    </div>
+
+                    <div>
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-semibold whitespace-nowrap block truncate
+                        ${log.status >= 500 ? "bg-red-50 text-red-500" :
+                          log.status >= 400 ? "bg-orange-50 text-orange-500" :
+                          log.status >= 200 && log.status < 300 ? "bg-green-50 text-green-600" :
+                          "bg-gray-100 text-gray-400"}`}
+                        title={log.statusLabel || `HTTP ${log.status}`}>
+                        {log.statusLabel || `HTTP ${log.status}`}
+                      </span>
+                    </div>
+
+                    <div className="min-w-0">
+                      {log.clientId ? (
+                        <span className="text-xs font-mono bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded
+                          truncate block" title={log.clientId}>
+                          {log.clientId}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">—</span>
+                      )}
+                    </div>
+
+                    <div className="text-right">
+                      <span className={`text-xs font-mono whitespace-nowrap
+                        ${log.latency > 1000 ? "text-orange-500" : "text-gray-400"}`}>
+                        {log.latency}ms
+                      </span>
+                    </div>
+
+                    <div className="text-right">
+                      {log.rateLimited && (
+                        <span className="text-xs bg-orange-50 text-orange-500 border border-orange-100
+                          px-1.5 py-0.5 rounded font-semibold"
+                          title={log.rateLimitType ?? "Rate limited"}>
+                          429
+                        </span>
+                      )}
+                    </div>
+
+                  </div>
+                ))}
+              </div>
 
                 {totalLogPages > 1 ? (
                   <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
@@ -537,6 +568,11 @@ export default function DeveloperDetailPage() {
               </div>
             )}
           </div>
+        )}
+
+
+        {tab === "clients" && (
+          <ClientsTab devId={devId} />
         )}
       </div>
 

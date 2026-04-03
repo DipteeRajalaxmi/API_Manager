@@ -113,6 +113,13 @@ export interface Subscription {
   usedPerHour?: number;
   usedPerDay?: number;
   usedTotal?: number;
+  planLimits?: Array<{
+  planName: string;
+  rateLimitPerMinute?: number | null;
+  rateLimitPerHour?: number | null;
+  rateLimitPerDay?: number | null;
+  rateLimitTotal?: number | null;
+}>;
 }
 
 export interface ApiKey {

@@ -2,6 +2,8 @@ package com.apimanager.portal.dto;
 
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 @Data
 public class SubscriptionResponse {
@@ -30,4 +32,8 @@ public class SubscriptionResponse {
     private Long usedPerHour;
     private Long usedPerDay;
     private Long usedTotal;
+
+    private List<Map<String, Object>> planLimits;
+
+    private Long approvedById;
 }

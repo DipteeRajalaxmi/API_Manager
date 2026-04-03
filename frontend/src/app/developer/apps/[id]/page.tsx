@@ -159,8 +159,11 @@ export default function AppDetailPage() {
   };
 
   const hasAnyLimit = (sub: Subscription) =>
-    sub.rateLimitPerMinute || sub.rateLimitPerHour ||
-    sub.rateLimitPerDay    || sub.rateLimitTotal;
+  sub.rateLimitPerMinute != null ||
+  sub.rateLimitPerHour   != null ||
+  sub.rateLimitPerDay    != null ||
+  sub.rateLimitTotal     != null ||
+  (sub.planLimits != null && sub.planLimits.length > 0);
 
   return (
     <DashboardLayout>
@@ -277,8 +280,8 @@ export default function AppDetailPage() {
                 {/* Usage alerts */}
                 <UsageAlerts sub={sub} />
 
-                {/* Usage bars — only if limits are set */}
-                {hasAnyLimit(sub) && (
+                {/* Usage bars — API-level limits */}
+                {(sub.rateLimitPerMinute || sub.rateLimitPerHour || sub.rateLimitPerDay || sub.rateLimitTotal) && (
                   <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 mb-4">
                     <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
                       Rate Limit Usage
@@ -290,7 +293,37 @@ export default function AppDetailPage() {
                   </div>
                 )}
 
-                {/* No limits set */}
+                {/* Plan-based limits — shown when API uses plan tiers */}
+                {sub.planLimits && sub.planLimits.length > 0 && (
+                  <div className="bg-purple-50 border border-purple-100 rounded-xl p-4 mb-4">
+                    <p className="text-xs font-bold text-purple-500 uppercase tracking-wider mb-3">
+                      Plan-based rate limits
+                    </p>
+                    <p className="text-xs text-purple-400 mb-3">
+                      Send <code className="font-mono bg-purple-100 px-1 rounded">X-Client-Plan</code> and{" "}
+                      <code className="font-mono bg-purple-100 px-1 rounded">X-Client-Id</code> headers
+                      with each request to apply plan limits.
+                    </p>
+                    <div className="flex flex-col gap-2">
+                      {sub.planLimits.map((plan) => (
+                        <div key={plan.planName}
+                          className="bg-white border border-purple-100 rounded-lg px-3 py-2.5">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-xs font-bold text-purple-700 capitalize">{plan.planName}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-3 text-xs text-gray-500">
+                            {plan.rateLimitPerMinute && <span><span className="font-semibold text-gray-700">{plan.rateLimitPerMinute}</span> / min</span>}
+                            {plan.rateLimitPerHour   && <span><span className="font-semibold text-gray-700">{plan.rateLimitPerHour}</span> / hour</span>}
+                            {plan.rateLimitPerDay    && <span><span className="font-semibold text-gray-700">{plan.rateLimitPerDay}</span> / day</span>}
+                            {plan.rateLimitTotal     && <span><span className="font-semibold text-gray-700">{plan.rateLimitTotal}</span> total</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Only show "unlimited" if truly no limits anywhere */}
                 {!hasAnyLimit(sub) && sub.status === "active" && (
                   <div className="bg-green-50 border border-green-100 rounded-xl p-3 mb-4 text-xs text-green-600 font-semibold">
                     ✅ No rate limits set — unlimited access

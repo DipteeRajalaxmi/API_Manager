@@ -13,6 +13,8 @@ import com.apimanager.portal.repository.SubscriptionRepository;
 import com.apimanager.portal.entity.SubscriptionEndpointPermission;
 import com.apimanager.portal.repository.SubscriptionEndpointPermissionRepository;
 import org.springframework.data.domain.PageRequest;
+import com.apimanager.registry.repository.ApiRepository;
+import com.apimanager.registry.repository.ApiPlanLimitRepository;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -28,6 +30,8 @@ public class AnalyticsController {
     private final UserRepository userRepo;
     private final SubscriptionRepository subscriptionRepo;
     private final SubscriptionEndpointPermissionRepository permissionRepo;
+    private final ApiRepository apiRepo;
+    private final ApiPlanLimitRepository apiPlanLimitRepo;
 
 
     // ── Provider analytics ────────────────────────────────────────────────────
@@ -139,7 +143,7 @@ public class AnalyticsController {
 
         long totalLogs = usageLogRepo.countLogsForDeveloper(user.getUserId());
 
-        // ✅ FIX: create logs list
+        // create logs list
         List<Map<String, Object>> logs = new ArrayList<>();
 
         for (ApiUsageLog log : recentLogs) {
@@ -250,7 +254,7 @@ public class AnalyticsController {
         return ResponseEntity.ok(result);
     }
 
-// Calendar heatmap — daily calls for a given year+month
+    // Calendar heatmap — daily calls for a given year+month
     @GetMapping("/provider/calendar")
     public ResponseEntity<List<Map<String, Object>>> getCalendarData(
             @RequestParam int year,
@@ -460,6 +464,128 @@ public class AnalyticsController {
             if (status == 503)  return "Service Unavailable";
             return "HTTP " + status;
         }
+
+
+@GetMapping("/provider/developer/{devId}/clients")
+public ResponseEntity<List<Map<String, Object>>> getDeveloperClients(
+        @PathVariable Long devId,
+        Authentication auth) {
+
+    User provider = userRepo.findByEmail(auth.getName())
+            .orElseThrow(() -> new RuntimeException("User not found"));
+    if (provider.getOrganization() == null)
+        return ResponseEntity.status(403).build();
+
+    Long orgId = provider.getOrganization().getOrgId();
+    User developer = userRepo.findById(devId)
+            .orElseThrow(() -> new RuntimeException("Developer not found"));
+    if (developer.getOrganization() == null ||
+        !developer.getOrganization().getOrgId().equals(orgId))
+        return ResponseEntity.status(403).build();
+
+    LocalDateTime now = LocalDateTime.now();
+
+    // no since filter — get all clients ever seen for this developer
+    List<Object[]> clientRows = usageLogRepo.clientStatsForDeveloper(devId);
+
+    List<Map<String, Object>> result = new ArrayList<>();
+
+    for (Object[] row : clientRows) {
+        String clientId   = row[0] != null ? row[0].toString() : null;
+        String clientPlan = row[1] != null ? row[1].toString() : null;
+        Long   apiId      = row[2] != null ? ((Number) row[2]).longValue() : null;
+        String apiName    = row[3] != null ? row[3].toString() : null;
+        long   totalCalls = row[4] != null ? ((Number) row[4]).longValue() : 0L;
+        Object lastCall   = row[5];
+        Long   subId      = row[6] != null ? ((Number) row[6]).longValue() : null;
+
+        if (clientId == null || subId == null) continue;
+
+        // ✅ correct tracking key — matches GatewayService exactly
+        String trackingKey = subId + ":" + clientId;
+
+        long usedMinute = usageLogRepo.countCallsSinceByTrackingKey(trackingKey, now.minusMinutes(1));
+        long usedHour   = usageLogRepo.countCallsSinceByTrackingKey(trackingKey, now.minusHours(1));
+        long usedDay    = usageLogRepo.countCallsSinceByTrackingKey(trackingKey, now.minusDays(1));
+        long usedTotal  = usageLogRepo.countTotalCallsByTrackingKey(trackingKey);
+
+       // resolve limits — plan first, then API global, then endpoint fallback
+        Long limitMinute = null, limitHour = null, limitDay = null, limitTotal = null;
+        String limitSource = "api";
+
+        // 1. Plan limits take priority
+        if (clientPlan != null && !clientPlan.isBlank() && apiId != null) {
+            var planLimit = apiPlanLimitRepo
+                    .findByApi_ApiIdAndPlanName(apiId, clientPlan.trim().toLowerCase())
+                    .orElse(null);
+            if (planLimit != null) {
+                limitMinute = planLimit.getRateLimitPerMinute();
+                limitHour   = planLimit.getRateLimitPerHour();
+                limitDay    = planLimit.getRateLimitPerDay();
+                limitTotal  = planLimit.getRateLimitTotal();
+                limitSource = "plan";
+            }
+        }
+
+        // 2. API global limits fallback
+        if (limitSource.equals("api") && apiId != null) {
+            var api = apiRepo.findById(apiId).orElse(null);
+            if (api != null) {
+                limitMinute = api.getRateLimitPerMinute();
+                limitHour   = api.getRateLimitPerHour();
+                limitDay    = api.getRateLimitPerDay();
+                limitTotal  = api.getRateLimitTotal();
+
+                // 3. No global limits → surface most restrictive endpoint limit
+                if (limitMinute == null && limitHour == null && limitDay == null && limitTotal == null) {
+                    if (api.getEndpoints() != null) {
+                        for (var ep : api.getEndpoints()) {
+                            if (ep.getRateLimitPerMinute() != null)
+                                limitMinute = limitMinute == null ? ep.getRateLimitPerMinute()
+                                            : Math.min(limitMinute, ep.getRateLimitPerMinute());
+                            if (ep.getRateLimitPerHour() != null)
+                                limitHour = limitHour == null ? ep.getRateLimitPerHour()
+                                          : Math.min(limitHour, ep.getRateLimitPerHour());
+                            if (ep.getRateLimitPerDay() != null)
+                                limitDay = limitDay == null ? ep.getRateLimitPerDay()
+                                         : Math.min(limitDay, ep.getRateLimitPerDay());
+                            if (ep.getRateLimitTotal() != null)
+                                limitTotal = limitTotal == null ? ep.getRateLimitTotal()
+                                           : Math.min(limitTotal, ep.getRateLimitTotal());
+                        }
+                        if (limitMinute != null || limitHour != null || limitDay != null || limitTotal != null)
+                            limitSource = "endpoint";
+                    }
+                }
+            }
+        }
+
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("clientId",    clientId);
+        m.put("clientPlan",  clientPlan);
+        m.put("apiId",       apiId);
+        m.put("apiName",     apiName);
+        m.put("lastCall",    lastCall);
+        m.put("totalCalls",  totalCalls);
+        m.put("limitSource", limitSource);
+        m.put("usedMinute",  usedMinute);
+        m.put("usedHour",    usedHour);
+        m.put("usedDay",     usedDay);
+        m.put("usedTotal",   usedTotal);
+        m.put("limitMinute", limitMinute);
+        m.put("limitHour",   limitHour);
+        m.put("limitDay",    limitDay);
+        m.put("limitTotal",  limitTotal);
+        m.put("remainingMinute", limitMinute != null ? Math.max(0, limitMinute - usedMinute) : null);
+        m.put("remainingHour",   limitHour   != null ? Math.max(0, limitHour   - usedHour)   : null);
+        m.put("remainingDay",    limitDay    != null ? Math.max(0, limitDay    - usedDay)     : null);
+        m.put("remainingTotal",  limitTotal  != null ? Math.max(0, limitTotal  - usedTotal)   : null);
+
+        result.add(m);
+    }
+
+    return ResponseEntity.ok(result);
+}
 
 }
 

@@ -255,4 +255,50 @@ public interface ApiUsageLogRepository extends JpaRepository<ApiUsageLog, Long> 
               "AND l.wasRateLimited = false")
        long countTotalCallsByTrackingKey(@Param("trackingKey") String trackingKey);
 
+
+
+       // @Query("""
+       // SELECT l.clientId, l.clientPlan,
+       //        l.api.apiId, l.api.apiName,
+       //        COUNT(l) as totalCalls,
+       //        MAX(l.requestTime) as lastCall
+       // FROM ApiUsageLog l
+       // WHERE l.developer.userId = :devId
+       // AND l.clientId IS NOT NULL
+       // AND l.requestTime >= :since
+       // GROUP BY l.clientId, l.clientPlan, l.api.apiId, l.api.apiName
+       // ORDER BY MAX(l.requestTime) DESC
+       // """)
+       // List<Object[]> clientStatsForDeveloper(
+       // @Param("devId") Long devId,
+       // @Param("since") LocalDateTime since);
+
+       @Query("""
+       SELECT l.clientId, l.clientPlan,
+              l.api.apiId, l.api.apiName,
+              COUNT(l) as totalCalls,
+              MAX(l.requestTime) as lastCall,
+              l.subscription.subscriptionId
+       FROM ApiUsageLog l
+       WHERE l.developer.userId = :devId
+       AND l.clientId IS NOT NULL
+       GROUP BY l.clientId, l.clientPlan, l.api.apiId, l.api.apiName,
+              l.subscription.subscriptionId
+       ORDER BY MAX(l.requestTime) DESC
+       """)
+       List<Object[]> clientStatsForDeveloper(@Param("devId") Long devId);
+
+
+       @Query("SELECT COUNT(u) FROM ApiUsageLog u WHERE u.trackingKey = :trackingKey AND u.endpointPath = :path AND u.requestTime >= :since AND u.wasRateLimited = false")
+       long countCallsSinceByTrackingKeyAndPath(
+       @Param("trackingKey") String trackingKey,
+       @Param("path") String path,
+       @Param("since") LocalDateTime since);
+
+       @Query("SELECT COUNT(u) FROM ApiUsageLog u WHERE u.trackingKey = :trackingKey AND u.endpointPath = :path AND u.wasRateLimited = false")
+       long countTotalCallsByTrackingKeyAndPath(
+       @Param("trackingKey") String trackingKey,
+       @Param("path") String path);
+
+
 }

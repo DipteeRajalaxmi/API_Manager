@@ -123,7 +123,7 @@ public class GatewayService {
         // 3b. Check endpoint-level rate limits first
         if (matchedEndpoint != null) {
             RateLimitResult epRl = checkEndpointRateLimits(
-                    sub.getSubscriptionId(), matchedEndpoint, normalizedPath);
+                sub.getSubscriptionId(), matchedEndpoint, normalizedPath, trackingKey, clientId);
             if (epRl.exceeded) {
                 logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
                         429L, System.currentTimeMillis() - startMs, true,
@@ -134,7 +134,7 @@ public class GatewayService {
         }
 
         // 3c. Check API-level rate limits
-        RateLimitResult rl = checkRateLimitsWithPlan(trackingKey, api, clientPlan);
+        RateLimitResult rl = checkRateLimitsWithPlan(trackingKey, api, clientPlan, clientId);
         if (rl.exceeded) {
             logCall(apiKey, sub, matchedEndpoint, apiPath, method.name(), request,
                     429L, System.currentTimeMillis() - startMs, true, rl.limitType,clientId, clientPlan, trackingKey);
@@ -233,49 +233,72 @@ public class GatewayService {
     }
 
     private RateLimitResult checkRateLimitsWithPlan(
-        String trackingKey, Api api, String clientPlan) {
-        LocalDateTime now = LocalDateTime.now();
+        String trackingKey, Api api, String clientPlan, String clientId) {
+    LocalDateTime now = LocalDateTime.now();
 
-        // If plan header provided, look up plan limits
-        if (clientPlan != null && !clientPlan.isBlank()) {
-            ApiPlanLimit planLimit = apiPlanLimitRepo
-                    .findByApi_ApiIdAndPlanName(api.getApiId(), clientPlan)
-                    .orElse(null);
+    // Plan limits take priority if plan header provided
+    if (clientPlan != null && !clientPlan.isBlank()) {
+        ApiPlanLimit planLimit = apiPlanLimitRepo
+                .findByApi_ApiIdAndPlanName(api.getApiId(), clientPlan)
+                .orElse(null);
 
-            if (planLimit != null) {
-                if (planLimit.getRateLimitPerMinute() != null) {
-                    long used = usageLogRepo.countCallsSinceByTrackingKey(
-                            trackingKey, now.minusMinutes(1));
-                    if (used >= planLimit.getRateLimitPerMinute())
-                        return RateLimitResult.exceeded(
-                                "PLAN_PER_MINUTE", planLimit.getRateLimitPerMinute(), 60);
-                }
-                if (planLimit.getRateLimitPerHour() != null) {
-                    long used = usageLogRepo.countCallsSinceByTrackingKey(
-                            trackingKey, now.minusHours(1));
-                    if (used >= planLimit.getRateLimitPerHour())
-                        return RateLimitResult.exceeded(
-                                "PLAN_PER_HOUR", planLimit.getRateLimitPerHour(), 3600);
-                }
-                if (planLimit.getRateLimitPerDay() != null) {
-                    long used = usageLogRepo.countCallsSinceByTrackingKey(
-                            trackingKey, now.minusDays(1));
-                    if (used >= planLimit.getRateLimitPerDay())
-                        return RateLimitResult.exceeded(
-                                "PLAN_PER_DAY", planLimit.getRateLimitPerDay(), 86400);
-                }
-                if (planLimit.getRateLimitTotal() != null) {
-                    long used = usageLogRepo.countTotalCallsByTrackingKey(trackingKey);
-                    if (used >= planLimit.getRateLimitTotal())
-                        return RateLimitResult.exceeded(
-                                "PLAN_TOTAL", planLimit.getRateLimitTotal(), 0);
-                }
-                return RateLimitResult.ok();
+        if (planLimit != null) {
+            if (planLimit.getRateLimitPerMinute() != null) {
+                long used = usageLogRepo.countCallsSinceByTrackingKey(trackingKey, now.minusMinutes(1));
+                if (used >= planLimit.getRateLimitPerMinute())
+                    return RateLimitResult.exceeded("PLAN_PER_MINUTE", planLimit.getRateLimitPerMinute(), 60);
             }
+            if (planLimit.getRateLimitPerHour() != null) {
+                long used = usageLogRepo.countCallsSinceByTrackingKey(trackingKey, now.minusHours(1));
+                if (used >= planLimit.getRateLimitPerHour())
+                    return RateLimitResult.exceeded("PLAN_PER_HOUR", planLimit.getRateLimitPerHour(), 3600);
+            }
+            if (planLimit.getRateLimitPerDay() != null) {
+                long used = usageLogRepo.countCallsSinceByTrackingKey(trackingKey, now.minusDays(1));
+                if (used >= planLimit.getRateLimitPerDay())
+                    return RateLimitResult.exceeded("PLAN_PER_DAY", planLimit.getRateLimitPerDay(), 86400);
+            }
+            if (planLimit.getRateLimitTotal() != null) {
+                long used = usageLogRepo.countTotalCallsByTrackingKey(trackingKey);
+                if (used >= planLimit.getRateLimitTotal())
+                    return RateLimitResult.exceeded("PLAN_TOTAL", planLimit.getRateLimitTotal(), 0);
+            }
+            return RateLimitResult.ok();
         }
+    }
 
-    // Fallback → existing API-level limits (unchanged)
-    return checkRateLimits(Long.parseLong(trackingKey.split(":")[0]), api);
+    // Fallback — per-client API limits if clientId present, else subscription-level
+    if (clientId != null && !clientId.isBlank()) {
+        return checkRateLimitsPerClient(trackingKey, api);
+    } else {
+        return checkRateLimits(Long.parseLong(trackingKey.split(":")[0]), api);
+    }
+}   // ← this closes checkRateLimitsWithPlan
+
+private RateLimitResult checkRateLimitsPerClient(String trackingKey, Api api) {
+    LocalDateTime now = LocalDateTime.now();
+
+    if (api.getRateLimitPerMinute() != null) {
+        long used = usageLogRepo.countCallsSinceByTrackingKey(trackingKey, now.minusMinutes(1));
+        if (used >= api.getRateLimitPerMinute())
+            return RateLimitResult.exceeded("PER_MINUTE", api.getRateLimitPerMinute(), 60);
+    }
+    if (api.getRateLimitPerHour() != null) {
+        long used = usageLogRepo.countCallsSinceByTrackingKey(trackingKey, now.minusHours(1));
+        if (used >= api.getRateLimitPerHour())
+            return RateLimitResult.exceeded("PER_HOUR", api.getRateLimitPerHour(), 3600);
+    }
+    if (api.getRateLimitPerDay() != null) {
+        long used = usageLogRepo.countCallsSinceByTrackingKey(trackingKey, now.minusDays(1));
+        if (used >= api.getRateLimitPerDay())
+            return RateLimitResult.exceeded("PER_DAY", api.getRateLimitPerDay(), 86400);
+    }
+    if (api.getRateLimitTotal() != null) {
+        long used = usageLogRepo.countTotalCallsByTrackingKey(trackingKey);
+        if (used >= api.getRateLimitTotal())
+            return RateLimitResult.exceeded("TOTAL", api.getRateLimitTotal(), 0);
+    }
+    return RateLimitResult.ok();
 }
  
     private RateLimitHeaders buildRateLimitHeaders(
@@ -518,25 +541,38 @@ public class GatewayService {
     }
 
     private RateLimitResult checkEndpointRateLimits(
-            Long subId, ApiEndpoint endpoint, String path) {
+        Long subId, ApiEndpoint endpoint, String path, String trackingKey, String clientId) {
         LocalDateTime now = LocalDateTime.now();
+
+        // If clientId present → count only this client's calls to this endpoint
+        // If no clientId → count all calls to this endpoint under this subscription (original)
+        boolean perClient = clientId != null && !clientId.isBlank();
+
         if (endpoint.getRateLimitPerMinute() != null) {
-            long used = usageLogRepo.countCallsSinceForEndpoint(subId, path, now.minusMinutes(1));
+            long used = perClient
+                ? usageLogRepo.countCallsSinceByTrackingKeyAndPath(trackingKey, path, now.minusMinutes(1))
+                : usageLogRepo.countCallsSinceForEndpoint(subId, path, now.minusMinutes(1));
             if (used >= endpoint.getRateLimitPerMinute())
                 return RateLimitResult.exceeded("PER_MINUTE", endpoint.getRateLimitPerMinute(), 60);
         }
         if (endpoint.getRateLimitPerHour() != null) {
-            long used = usageLogRepo.countCallsSinceForEndpoint(subId, path, now.minusHours(1));
+            long used = perClient
+                ? usageLogRepo.countCallsSinceByTrackingKeyAndPath(trackingKey, path, now.minusHours(1))
+                : usageLogRepo.countCallsSinceForEndpoint(subId, path, now.minusHours(1));
             if (used >= endpoint.getRateLimitPerHour())
                 return RateLimitResult.exceeded("PER_HOUR", endpoint.getRateLimitPerHour(), 3600);
         }
         if (endpoint.getRateLimitPerDay() != null) {
-            long used = usageLogRepo.countCallsSinceForEndpoint(subId, path, now.minusDays(1));
+            long used = perClient
+                ? usageLogRepo.countCallsSinceByTrackingKeyAndPath(trackingKey, path, now.minusDays(1))
+                : usageLogRepo.countCallsSinceForEndpoint(subId, path, now.minusDays(1));
             if (used >= endpoint.getRateLimitPerDay())
                 return RateLimitResult.exceeded("PER_DAY", endpoint.getRateLimitPerDay(), 86400);
         }
         if (endpoint.getRateLimitTotal() != null) {
-            long used = usageLogRepo.countTotalCallsForEndpoint(subId, path);
+            long used = perClient
+                ? usageLogRepo.countTotalCallsByTrackingKeyAndPath(trackingKey, path)
+                : usageLogRepo.countTotalCallsForEndpoint(subId, path);
             if (used >= endpoint.getRateLimitTotal())
                 return RateLimitResult.exceeded("TOTAL", endpoint.getRateLimitTotal(), 0);
         }
