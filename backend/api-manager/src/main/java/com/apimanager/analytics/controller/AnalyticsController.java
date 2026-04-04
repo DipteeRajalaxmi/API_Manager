@@ -155,6 +155,8 @@ public class AnalyticsController {
             m.put("latency", log.getLatencyMs());
             m.put("rateLimited", log.getWasRateLimited());
             m.put("apiName", log.getApi() != null ? log.getApi().getApiName() : "—");
+            m.put("clientId",    log.getClientId());    
+            m.put("clientPlan",  log.getClientPlan()); 
             logs.add(m);
         }
 

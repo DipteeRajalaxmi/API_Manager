@@ -26,6 +26,8 @@ interface UsageLog {
   latency: number;
   rateLimited: boolean;
   apiName?: string;
+  clientId?: string;
+  clientPlan?: string;
 }
 
 interface DeveloperAnalytics {
@@ -119,6 +121,23 @@ export default function DeveloperAnalyticsPage() {
   const [loading,     setLoading]     = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
   const [activeTab,   setActiveTab]   = useState<"overview" | "logs">("overview");
+  const [filterPlan,   setFilterPlan]   = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+
+  const filteredLogs = logs.filter(log => {
+    if (filterPlan !== "all") {
+      const logPlan = log.clientPlan ?? "";
+      if (logPlan !== filterPlan) return false;
+    }
+    if (filterStatus === "2xx" && (log.status < 200 || log.status >= 300)) return false;
+    if (filterStatus === "4xx" && (log.status < 400 || log.status >= 500)) return false;
+    if (filterStatus === "5xx" && log.status < 500) return false;
+    if (filterStatus === "429" && log.status !== 429) return false;
+    return true;
+  });
+  const uniquePlans = Array.from(
+  new Set(logs.map(l => l.clientPlan ?? ""))
+).sort();
 
   useEffect(() => {
     apiClient.get("/api/analytics/developer")
@@ -154,11 +173,11 @@ export default function DeveloperAnalyticsPage() {
     : 0;
 
   const statCards = [
-    { label: "Today",       value: data?.callsToday ?? 0,     icon: "⚡", accent: "#319795", trend: "+12%" },
-    { label: "This Week",   value: data?.callsThisWeek ?? 0,  icon: "📅", accent: "#3182ce", trend: "+8%"  },
-    { label: "This Month",  value: data?.callsThisMonth ?? 0, icon: "🗓", accent: "#805ad5", trend: "+21%" },
+    { label: "Today",       value: data?.callsToday ?? 0,     icon: "⚡", accent: "#319795", trend: "" },
+    { label: "This Week",   value: data?.callsThisWeek ?? 0,  icon: "📅", accent: "#3182ce", trend: ""  },
+    { label: "This Month",  value: data?.callsThisMonth ?? 0, icon: "🗓", accent: "#805ad5", trend: "" },
     { label: "All Time",    value: data?.totalCalls ?? 0,     icon: "∞",  accent: "#dd6b20", trend: ""     },
-    { label: "Avg Latency", value: `${avgLatency}ms`,         icon: "⏱", accent: "#38a169", trend: "-5%"  },
+    { label: "Avg Latency", value: `${avgLatency}ms`,         icon: "⏱", accent: "#38a169", trend: ""  },
     { label: "Error Rate",  value: `${errorRate}%`,           icon: "⚠",  accent: errorRate > 5 ? "#e53e3e" : "#38a169", trend: "" },
   ];
 
@@ -740,20 +759,59 @@ export default function DeveloperAnalyticsPage() {
               <div className="empty">No request logs yet.</div>
             ) : (
               <>
-                <div className="log-head">
-                  <div>Time</div>
-                  <div>Method</div>
-                  <div>Path</div>
-                  <div>Status</div>
-                  <div>Latency</div>
-                  <div>API</div>
-                </div>
+                {/* Filter bar */}
+              <div style={{ display:"flex", gap:"0.75rem", padding:"0.75rem 1.5rem", borderBottom:"1px solid var(--border)", background:"#f7fafc", flexWrap:"wrap", alignItems:"center" }}>
+                <span style={{ fontSize:".72rem", fontWeight:700, color:"var(--muted2)", textTransform:"uppercase", letterSpacing:".08em" }}>Filter:</span>
+                
+                <select value={filterPlan} onChange={e => setFilterPlan(e.target.value)}
+                  style={{ fontSize:".75rem", fontWeight:600, padding:".3rem .75rem", borderRadius:8, 
+                    border:"1.5px solid var(--border)", background:"#fff", color:"var(--muted)", 
+                    cursor:"pointer", fontFamily:"inherit" }}>
+                  <option value="all">All Plans</option>
+                  {uniquePlans.map(plan => (
+                    <option key={plan} value={plan}>
+                      {plan === "" ? "No Plan" : plan.charAt(0).toUpperCase() + plan.slice(1)}
+                    </option>
+                  ))}
+                </select>
+
+                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+                  style={{ fontSize:".75rem", fontWeight:600, padding:".3rem .75rem", borderRadius:8, border:"1.5px solid var(--border)", background:"#fff", color:"var(--muted)", cursor:"pointer", fontFamily:"inherit" }}>
+                  <option value="all">All Status</option>
+                  <option value="2xx">2xx Success</option>
+                  <option value="4xx">4xx Client Error</option>
+                  <option value="429">429 Rate Limited</option>
+                  <option value="5xx">5xx Server Error</option>
+                </select>
+
+                {(filterPlan !== "all" || filterStatus !== "all") && (
+                  <button onClick={() => { setFilterPlan("all"); setFilterStatus("all"); }}
+                    style={{ fontSize:".72rem", fontWeight:700, padding:".3rem .75rem", borderRadius:8, border:"1.5px solid var(--border)", background:"#fff", color:"var(--red)", cursor:"pointer", fontFamily:"inherit" }}>
+                    ✕ Clear
+                  </button>
+                )}
+
+                <span style={{ marginLeft:"auto", fontSize:".72rem", color:"var(--muted3)", fontFamily:"'DM Mono',monospace" }}>
+                  {filteredLogs.length} of {logs.length} shown
+                </span>
+              </div>
+
+              <div className="log-head" style={{ gridTemplateColumns:"140px 68px 1fr 80px 80px 90px 100px 90px" }}>
+                <div>Time</div>
+                <div>Method</div>
+                <div>Path</div>
+                <div>Status</div>
+                <div>Latency</div>
+                <div>Client</div>
+                <div>Plan</div>
+                <div>API</div>
+              </div>
                 <div style={{ opacity: logsLoading ? .5 : 1, transition: "opacity .2s" }}>
-                  {logs.map((log, i) => {
+                  {filteredLogs.map((log, i) => {
                     const s  = getStatusStyle(log.status);
                     const ms = METHOD_STYLE[log.method] ?? { bg: "rgba(160,174,192,.12)", color: "#718096" };
                     return (
-                      <div key={i} className="log-row">
+                      <div key={i} className="log-row" style={{ gridTemplateColumns:"140px 68px 1fr 80px 80px 90px 100px 90px" }}>
                         <div style={{ color: "var(--muted2)", fontSize: ".68rem" }}>
                           {new Date(log.requestTime).toLocaleString("en-IN", {
                             day: "numeric", month: "short",
@@ -775,6 +833,30 @@ export default function DeveloperAnalyticsPage() {
                         </div>
                         <div style={{ color: Number(log.latency) > 500 ? "var(--amber)" : "var(--muted2)" }}>
                           {log.latency ?? "—"}ms
+                        </div>
+                        {/* Client ID */}
+                        <div style={{ color: "var(--muted2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize:".68rem" }}
+                          title={log.clientId}>
+                          {log.clientId ?? "—"}
+                        </div>
+                        {/* Plan */}
+                        <div>
+                          {log.clientPlan ? (
+                            <span className="pill" style={{
+                              fontSize: ".66rem",
+                              background: log.clientPlan === "enterprise"   ? "rgba(128,90,213,.1)"  :
+                                          log.clientPlan === "business"     ? "rgba(49,130,206,.1)"  :
+                                          log.clientPlan === "professional" ? "rgba(49,151,149,.1)"  :
+                                                                              "rgba(160,174,192,.1)",
+                              color:      log.clientPlan === "enterprise"   ? "var(--purple)" :
+                                          log.clientPlan === "business"     ? "var(--blue)"   :
+                                          log.clientPlan === "professional" ? "var(--teal)"   :
+                                                                              "var(--muted2)",
+                              textTransform: "capitalize"
+                            }}>
+                              {log.clientPlan}
+                            </span>
+                          ) : <span style={{ color:"var(--muted3)", fontSize:".68rem" }}>—</span>}
                         </div>
                         <div style={{ color: "var(--muted2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {log.apiName ?? "—"}
