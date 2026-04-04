@@ -12,9 +12,9 @@ CREATE TABLE IF NOT EXISTS access_tokens (
     )
 );
 
-CREATE INDEX idx_access_tokens_key_id       ON access_tokens(key_id);
-CREATE INDEX idx_access_tokens_access_token ON access_tokens(access_token);
-CREATE INDEX idx_access_tokens_expires_at   ON access_tokens(expires_at);  -- for expiry cleanup jobs
+CREATE INDEX IF NOT EXISTS idx_access_tokens_key_id       ON access_tokens(key_id);
+CREATE INDEX IF NOT EXISTS idx_access_tokens_access_token ON access_tokens(access_token);
+CREATE INDEX IF NOT EXISTS idx_access_tokens_expires_at   ON access_tokens(expires_at);  -- for expiry cleanup jobs
 
 
 

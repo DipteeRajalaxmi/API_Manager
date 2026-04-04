@@ -10,6 +10,6 @@ CREATE TABLE IF NOT EXISTS organizations (
     CONSTRAINT chk_org_status CHECK (status IN ('active','suspended','deleted'))
 );
 
-CREATE INDEX idx_organizations_domain  ON organizations(domain);
-CREATE INDEX idx_organizations_status  ON organizations(status);
-CREATE INDEX idx_organizations_invite_code ON organizations(invite_code);
+CREATE INDEX IF NOT EXISTS idx_organizations_domain  ON organizations(domain);
+CREATE INDEX IF NOT EXISTS idx_organizations_status  ON organizations(status);
+CREATE INDEX IF NOT EXISTS idx_organizations_invite_code ON organizations(invite_code);

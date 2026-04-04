@@ -14,5 +14,5 @@ CREATE TABLE IF NOT EXISTS policies (
     CONSTRAINT chk_policy_scope CHECK (scope IN ('global','api','operation'))
 );
 
-CREATE INDEX idx_policies_api_id      ON policies(api_id);
-CREATE INDEX idx_policies_policy_type ON policies(policy_type);
+CREATE INDEX IF NOT EXISTS idx_policies_api_id      ON policies(api_id);
+CREATE INDEX IF NOT EXISTS idx_policies_policy_type ON policies(policy_type);

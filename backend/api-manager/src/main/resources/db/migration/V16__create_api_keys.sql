@@ -11,6 +11,6 @@ CREATE TABLE IF NOT EXISTS api_keys (
     CONSTRAINT chk_key_status CHECK (status   IN ('active','revoked','expired'))
 );
 
-CREATE INDEX idx_api_keys_app_id    ON api_keys(app_id);
-CREATE INDEX idx_api_keys_client_id ON api_keys(client_id);
-CREATE INDEX idx_api_keys_status    ON api_keys(status);
+CREATE INDEX IF NOT EXISTS idx_api_keys_app_id    ON api_keys(app_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_client_id ON api_keys(client_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_status    ON api_keys(status);

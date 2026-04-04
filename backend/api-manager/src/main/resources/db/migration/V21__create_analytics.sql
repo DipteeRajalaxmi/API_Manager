@@ -11,5 +11,5 @@ CREATE TABLE IF NOT EXISTS analytics (
     UNIQUE (api_id, metric_date)    -- one row per API per day, upserted by the analytics job
 );
 
-CREATE INDEX idx_analytics_api_id      ON analytics(api_id);
-CREATE INDEX idx_analytics_metric_date ON analytics(metric_date DESC);
+CREATE INDEX IF NOT EXISTS idx_analytics_api_id      ON analytics(api_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_metric_date ON analytics(metric_date DESC);

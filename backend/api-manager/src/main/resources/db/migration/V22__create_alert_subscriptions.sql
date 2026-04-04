@@ -16,6 +16,6 @@ CREATE TABLE IF NOT EXISTS alert_subscriptions (
     )   -- must have at least one notification channel
 );
 
-CREATE INDEX idx_alert_subscriptions_user_id ON alert_subscriptions(user_id);
-CREATE INDEX idx_alert_subscriptions_api_id  ON alert_subscriptions(api_id);
-CREATE INDEX idx_alert_subscriptions_enabled ON alert_subscriptions(enabled);
+CREATE INDEX IF NOT EXISTS idx_alert_subscriptions_user_id ON alert_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_alert_subscriptions_api_id  ON alert_subscriptions(api_id);
+CREATE INDEX IF NOT EXISTS idx_alert_subscriptions_enabled ON alert_subscriptions(enabled);

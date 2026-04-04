@@ -12,6 +12,6 @@ CREATE TABLE IF NOT EXISTS api_plan_limits (
 );
 
 -- Add client tracking to usage logs
-ALTER TABLE api_usage_logs ADD COLUMN client_id VARCHAR(255);
-ALTER TABLE api_usage_logs ADD COLUMN client_plan VARCHAR(100);
-ALTER TABLE api_usage_logs ADD COLUMN tracking_key VARCHAR(500);
+ALTER TABLE api_usage_logs ADD COLUMN IF NOT EXISTS  client_id VARCHAR(255);
+ALTER TABLE api_usage_logs ADD COLUMN IF NOT EXISTS client_plan VARCHAR(100);
+ALTER TABLE api_usage_logs ADD COLUMN IF NOT EXISTS tracking_key VARCHAR(500);

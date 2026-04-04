@@ -6,5 +6,5 @@ CREATE TABLE IF NOT EXISTS oauth_scopes (
     description  TEXT
 );
 
-CREATE INDEX idx_oauth_scopes_api_id    ON oauth_scopes(api_id);
-CREATE INDEX idx_oauth_scopes_scope_key ON oauth_scopes(scope_key);
+CREATE INDEX IF NOT EXISTS idx_oauth_scopes_api_id    ON oauth_scopes(api_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_scopes_scope_key ON oauth_scopes(scope_key);

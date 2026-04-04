@@ -13,6 +13,6 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     UNIQUE (api_id, app_id)     -- one app can only subscribe to an API once
 );
 
-CREATE INDEX idx_subscriptions_api_id  ON subscriptions(api_id);
-CREATE INDEX idx_subscriptions_app_id  ON subscriptions(app_id);
-CREATE INDEX idx_subscriptions_status  ON subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_api_id  ON subscriptions(api_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_app_id  ON subscriptions(app_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status  ON subscriptions(status);

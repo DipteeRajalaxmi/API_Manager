@@ -13,5 +13,5 @@ CREATE TABLE IF NOT EXISTS gateway_routes (
     UNIQUE (api_id, environment)    -- one route per API per environment
 );
 
-CREATE INDEX idx_gateway_routes_api_id      ON gateway_routes(api_id);
-CREATE INDEX idx_gateway_routes_environment ON gateway_routes(environment);
+CREATE INDEX IF NOT EXISTS idx_gateway_routes_api_id      ON gateway_routes(api_id);
+CREATE INDEX IF NOT EXISTS idx_gateway_routes_environment ON gateway_routes(environment);

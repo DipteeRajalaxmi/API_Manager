@@ -17,4 +17,4 @@ CREATE TABLE IF NOT EXISTS api_endpoints (
     UNIQUE (api_id, method, path)
 );
 
-CREATE INDEX idx_api_endpoints_api_id ON api_endpoints(api_id);
+CREATE INDEX IF NOT EXISTS idx_api_endpoints_api_id ON api_endpoints(api_id);

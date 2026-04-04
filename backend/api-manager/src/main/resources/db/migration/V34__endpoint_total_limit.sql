@@ -1,2 +1,2 @@
 ALTER TABLE api_endpoints
-ADD COLUMN rate_limit_total BIGINT;
+ADD COLUMN IF NOT EXISTS rate_limit_total BIGINT;

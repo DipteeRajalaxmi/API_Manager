@@ -11,6 +11,6 @@ CREATE TABLE IF NOT EXISTS api_deployments (
     CONSTRAINT chk_deploy_status CHECK (status      IN ('active','rolled_back','failed'))
 );
 
-CREATE INDEX idx_api_deployments_api_id      ON api_deployments(api_id);
-CREATE INDEX idx_api_deployments_deployed_by ON api_deployments(deployed_by);
-CREATE INDEX idx_api_deployments_status      ON api_deployments(status);
+CREATE INDEX IF NOT EXISTS idx_api_deployments_api_id      ON api_deployments(api_id);
+CREATE INDEX IF NOT EXISTS idx_api_deployments_deployed_by ON api_deployments(deployed_by);
+CREATE INDEX IF NOT EXISTS idx_api_deployments_status      ON api_deployments(status);

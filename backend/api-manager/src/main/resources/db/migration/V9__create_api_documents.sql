@@ -14,4 +14,4 @@ CREATE TABLE IF NOT EXISTS api_documents (
     )   
 );
 
-CREATE INDEX idx_api_documents_api_id ON api_documents(api_id);
+CREATE INDEX IF NOT EXISTS idx_api_documents_api_id ON api_documents(api_id);

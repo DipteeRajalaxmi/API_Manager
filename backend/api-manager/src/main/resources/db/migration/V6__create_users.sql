@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
     CONSTRAINT chk_user_status CHECK (status IN ('active','inactive','banned'))
 );
 
-CREATE INDEX idx_users_email   ON users(email);
-CREATE INDEX idx_users_role_id ON users(role_id);
-CREATE INDEX idx_users_org_id  ON users(org_id);
-CREATE INDEX idx_users_status  ON users(status);
+CREATE INDEX IF NOT EXISTS idx_users_email   ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role_id ON users(role_id);
+CREATE INDEX IF NOT EXISTS idx_users_org_id  ON users(org_id);
+CREATE INDEX IF NOT EXISTS idx_users_status  ON users(status);

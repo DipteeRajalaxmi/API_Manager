@@ -26,8 +26,8 @@ CREATE TABLE IF NOT EXISTS apis (
     )
 );
 
-CREATE INDEX idx_apis_provider_id     ON apis(provider_id);
-CREATE INDEX idx_apis_category_id     ON apis(category_id);
-CREATE INDEX idx_apis_lifecycle_state ON apis(lifecycle_state);
-CREATE INDEX idx_apis_visibility      ON apis(visibility);
-CREATE INDEX idx_apis_tags            ON apis USING GIN(tags); 
+CREATE INDEX IF NOT EXISTS idx_apis_provider_id     ON apis(provider_id);
+CREATE INDEX IF NOT EXISTS idx_apis_category_id     ON apis(category_id);
+CREATE INDEX IF NOT EXISTS idx_apis_lifecycle_state ON apis(lifecycle_state);
+CREATE INDEX IF NOT EXISTS idx_apis_visibility      ON apis(visibility);
+CREATE INDEX IF NOT EXISTS idx_apis_tags            ON apis USING GIN(tags); 

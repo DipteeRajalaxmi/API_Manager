@@ -1,3 +1,3 @@
 ALTER TABLE users
-    ADD COLUMN reset_token_hash        VARCHAR(255),
-    ADD COLUMN reset_token_expires_at  TIMESTAMP;
+    ADD COLUMN IF NOT EXISTS reset_token_hash        VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS reset_token_expires_at  TIMESTAMP;

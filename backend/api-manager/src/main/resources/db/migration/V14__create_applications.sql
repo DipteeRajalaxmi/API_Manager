@@ -13,9 +13,9 @@ CREATE TABLE IF NOT EXISTS applications (
     UNIQUE (developer_id, app_name)         -- same developer can't have two apps with same name
 );
 
-CREATE INDEX idx_applications_developer_id ON applications(developer_id);
-CREATE INDEX idx_applications_org_id       ON applications(org_id);
-CREATE INDEX idx_applications_status       ON applications(status);
+CREATE INDEX IF NOT EXISTS idx_applications_developer_id ON applications(developer_id);
+CREATE INDEX IF NOT EXISTS idx_applications_org_id       ON applications(org_id);
+CREATE INDEX IF NOT EXISTS idx_applications_status       ON applications(status);
 
 
 

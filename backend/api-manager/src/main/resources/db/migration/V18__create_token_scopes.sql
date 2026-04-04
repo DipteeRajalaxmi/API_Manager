@@ -4,5 +4,5 @@ CREATE TABLE IF NOT EXISTS token_scopes (
     PRIMARY KEY (token_id, scope_id)
 );
 
-CREATE INDEX idx_token_scopes_token_id ON token_scopes(token_id);
-CREATE INDEX idx_token_scopes_scope_id ON token_scopes(scope_id);
+CREATE INDEX IF NOT EXISTS idx_token_scopes_token_id ON token_scopes(token_id);
+CREATE INDEX IF NOT EXISTS idx_token_scopes_scope_id ON token_scopes(scope_id);

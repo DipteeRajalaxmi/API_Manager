@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS api_usage_logs (
 );
 
 -- Indexes — built on the partition key first for max performance
-CREATE INDEX idx_usage_logs_api_id       ON api_usage_logs(api_id, request_time DESC);
-CREATE INDEX idx_usage_logs_app_id       ON api_usage_logs(app_id, request_time DESC);
-CREATE INDEX idx_usage_logs_status       ON api_usage_logs(response_status);
-CREATE INDEX idx_usage_logs_request_time ON api_usage_logs(request_time DESC);
+CREATE INDEX IF NOT EXISTS idx_usage_logs_api_id       ON api_usage_logs(api_id, request_time DESC);
+CREATE INDEX IF NOT EXISTS idx_usage_logs_app_id       ON api_usage_logs(app_id, request_time DESC);
+CREATE INDEX IF NOT EXISTS idx_usage_logs_status       ON api_usage_logs(response_status);
+CREATE INDEX IF NOT EXISTS idx_usage_logs_request_time ON api_usage_logs(request_time DESC);
