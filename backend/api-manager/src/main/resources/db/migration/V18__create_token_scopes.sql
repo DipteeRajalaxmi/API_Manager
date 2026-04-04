@@ -1,4 +1,4 @@
-CREATE TABLE token_scopes (
+CREATE TABLE IF NOT EXISTS token_scopes (
     token_id BIGINT NOT NULL REFERENCES access_tokens(token_id) ON DELETE CASCADE,
     scope_id BIGINT NOT NULL REFERENCES oauth_scopes(scope_id)  ON DELETE CASCADE,
     PRIMARY KEY (token_id, scope_id)

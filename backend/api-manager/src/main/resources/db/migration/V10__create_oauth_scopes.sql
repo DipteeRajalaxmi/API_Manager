@@ -1,4 +1,4 @@
-CREATE TABLE oauth_scopes (
+CREATE TABLE IF NOT EXISTS oauth_scopes (
     scope_id     BIGSERIAL       PRIMARY KEY,
     api_id       BIGINT          NOT NULL REFERENCES apis(api_id) ON DELETE CASCADE,
     scope_key    VARCHAR(100) NOT NULL UNIQUE,   -- e.g. read:orders, write:payments

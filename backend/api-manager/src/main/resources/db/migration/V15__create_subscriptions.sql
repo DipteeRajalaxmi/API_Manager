@@ -1,4 +1,4 @@
-CREATE TABLE subscriptions (
+CREATE TABLE IF NOT EXISTS subscriptions (
     subscription_id BIGSERIAL      PRIMARY KEY,
     api_id          BIGINT         NOT NULL REFERENCES apis(api_id)          ON DELETE CASCADE,
     app_id          BIGINT         NOT NULL REFERENCES applications(app_id)  ON DELETE CASCADE,

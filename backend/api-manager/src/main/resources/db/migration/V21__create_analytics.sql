@@ -1,4 +1,4 @@
-CREATE TABLE analytics (
+CREATE TABLE IF NOT EXISTS analytics (
     analytic_id        BIGSERIAL  PRIMARY KEY,
     api_id              BIGINT     NOT NULL REFERENCES apis(api_id) ON DELETE CASCADE,
     metric_date         DATE    NOT NULL,

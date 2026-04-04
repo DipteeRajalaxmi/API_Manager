@@ -1,4 +1,4 @@
-CREATE TABLE refresh_tokens (
+CREATE TABLE IF NOT EXISTS refresh_tokens (
     rt_id         BIGSERIAL    PRIMARY KEY,
     key_id        BIGINT       NOT NULL REFERENCES api_keys(key_id) ON DELETE CASCADE,
     refresh_token TEXT      NOT NULL UNIQUE,

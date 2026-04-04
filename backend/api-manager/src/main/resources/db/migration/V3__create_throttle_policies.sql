@@ -1,4 +1,4 @@
-CREATE TABLE throttle_policies (
+CREATE TABLE IF NOT EXISTS throttle_policies (
     tp_id         BIGSERIAL       PRIMARY KEY,
     policy_name   VARCHAR(100) NOT NULL UNIQUE,
     tier_type     VARCHAR(30)  NOT NULL,   -- APPLICATION / SUBSCRIPTION / API / OPERATION

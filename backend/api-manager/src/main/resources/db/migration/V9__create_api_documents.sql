@@ -1,5 +1,5 @@
 
-CREATE TABLE api_documents (
+CREATE TABLE IF NOT EXISTS api_documents (
     doc_id       BIGSERIAL       PRIMARY KEY,
     api_id       BIGINT          NOT NULL REFERENCES apis(api_id) ON DELETE CASCADE,
     doc_type     VARCHAR(30)  NOT NULL DEFAULT 'OTHER',

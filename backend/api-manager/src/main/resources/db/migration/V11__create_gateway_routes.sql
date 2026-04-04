@@ -1,4 +1,4 @@
-CREATE TABLE gateway_routes (
+CREATE TABLE IF NOT EXISTS gateway_routes (
     route_id     BIGSERIAL       PRIMARY KEY,
     api_id       BIGINT          NOT NULL REFERENCES apis(api_id) ON DELETE CASCADE,
     environment  VARCHAR(20)  NOT NULL DEFAULT 'production',

@@ -1,4 +1,4 @@
-CREATE TABLE alert_subscriptions (
+CREATE TABLE IF NOT EXISTS alert_subscriptions (
     alert_id       BIGSERIAL        PRIMARY KEY,
     user_id         BIGINT           NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     api_id          BIGINT           NOT NULL REFERENCES apis(api_id)   ON DELETE CASCADE,

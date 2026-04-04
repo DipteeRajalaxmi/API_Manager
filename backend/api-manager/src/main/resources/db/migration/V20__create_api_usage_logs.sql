@@ -1,4 +1,4 @@
-CREATE TABLE api_usage_logs (
+CREATE TABLE IF NOT EXISTS api_usage_logs (
     log_id          BIGSERIAL    PRIMARY KEY,  
     api_id          BIGINT          NOT NULL REFERENCES apis(api_id)          ON DELETE CASCADE,
     app_id          BIGINT          REFERENCES applications(app_id)           ON DELETE SET NULL,

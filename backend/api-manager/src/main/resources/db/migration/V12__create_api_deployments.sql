@@ -1,4 +1,4 @@
-CREATE TABLE api_deployments (
+CREATE TABLE IF NOT EXISTS api_deployments (
     deploy_id    BIGSERIAL       PRIMARY KEY,
     api_id       BIGINT          NOT NULL REFERENCES apis(api_id)   ON DELETE CASCADE,
     gateway_node VARCHAR(100) NOT NULL,

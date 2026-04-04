@@ -1,4 +1,4 @@
-CREATE TABLE audit_logs (
+CREATE TABLE IF NOT EXISTS audit_logs (
     audit_id     BIGSERIAL    PRIMARY KEY,   -- BIGSERIAL — high volume expected
     user_id     BIGINT          REFERENCES users(user_id) ON DELETE SET NULL,
     action       VARCHAR(100) NOT NULL,

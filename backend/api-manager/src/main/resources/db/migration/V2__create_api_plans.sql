@@ -1,4 +1,4 @@
-CREATE TABLE api_plans (
+CREATE TABLE IF NOT EXISTS api_plans (
     plan_id       BIGSERIAL          PRIMARY KEY,
     plan_name     VARCHAR(100)    NOT NULL UNIQUE,
     rate_limit    BIGINT             NOT NULL,   -- requests per second

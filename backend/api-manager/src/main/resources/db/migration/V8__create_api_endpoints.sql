@@ -1,4 +1,4 @@
-CREATE TABLE api_endpoints (
+CREATE TABLE IF NOT EXISTS api_endpoints (
     endpoint_id         BIGSERIAL       PRIMARY KEY,
     api_id              BIGINT          NOT NULL REFERENCES apis(api_id) ON DELETE CASCADE,
     method              VARCHAR(10)     NOT NULL,

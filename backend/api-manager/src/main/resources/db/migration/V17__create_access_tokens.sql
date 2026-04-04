@@ -1,4 +1,4 @@
-CREATE TABLE access_tokens (
+CREATE TABLE IF NOT EXISTS access_tokens (
     token_id     BIGSERIAL      PRIMARY KEY,
     key_id       BIGINT         NOT NULL REFERENCES api_keys(key_id) ON DELETE CASCADE,
     access_token TEXT        NOT NULL UNIQUE,

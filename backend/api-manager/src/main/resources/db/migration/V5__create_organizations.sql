@@ -1,4 +1,4 @@
-CREATE TABLE organizations (
+CREATE TABLE IF NOT EXISTS organizations (
     org_id     BIGSERIAL       PRIMARY KEY,
     org_name   VARCHAR(150) NOT NULL UNIQUE,
     domain     VARCHAR(100),

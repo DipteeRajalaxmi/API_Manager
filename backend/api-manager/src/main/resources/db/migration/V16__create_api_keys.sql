@@ -1,4 +1,4 @@
-CREATE TABLE api_keys (
+CREATE TABLE IF NOT EXISTS api_keys (
     key_id        BIGSERIAL       PRIMARY KEY,
     app_id        BIGINT          NOT NULL REFERENCES applications(app_id) ON DELETE CASCADE,
     client_id     VARCHAR(200) NOT NULL UNIQUE,

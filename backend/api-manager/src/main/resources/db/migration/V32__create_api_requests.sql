@@ -1,4 +1,4 @@
-CREATE TABLE api_requests (
+CREATE TABLE IF NOT EXISTS api_requests (
     request_id       BIGSERIAL PRIMARY KEY,
     org_id           BIGINT REFERENCES organizations(org_id),
     submitted_by     BIGINT REFERENCES users(user_id),

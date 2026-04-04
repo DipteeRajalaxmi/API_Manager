@@ -1,4 +1,4 @@
-CREATE TABLE policies (
+CREATE TABLE IF NOT EXISTS policies (
     policy_id     BIGSERIAL      PRIMARY KEY,
     api_id        BIGINT         NOT NULL REFERENCES apis(api_id) ON DELETE CASCADE,
     policy_type   VARCHAR(50) NOT NULL,

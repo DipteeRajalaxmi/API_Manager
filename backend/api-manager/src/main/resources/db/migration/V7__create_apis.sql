@@ -1,4 +1,4 @@
-CREATE TABLE apis (
+CREATE TABLE IF NOT EXISTS apis (
     api_id          BIGSERIAL       PRIMARY KEY,
     name            VARCHAR(150) NOT NULL,
     description     TEXT,

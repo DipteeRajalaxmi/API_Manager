@@ -1,4 +1,4 @@
-CREATE TABLE applications (
+CREATE TABLE IF NOT EXISTS applications (
     app_id       BIGSERIAL       PRIMARY KEY,
     developer_id BIGINT          NOT NULL REFERENCES users(user_id)          ON DELETE RESTRICT,
     org_id       BIGINT          REFERENCES organizations(org_id)            ON DELETE SET NULL,

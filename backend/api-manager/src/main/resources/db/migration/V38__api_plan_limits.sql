@@ -1,5 +1,5 @@
 -- New table for per-API plan limits
-CREATE TABLE api_plan_limits (
+CREATE TABLE IF NOT EXISTS api_plan_limits (
   id BIGSERIAL PRIMARY KEY,
   api_id BIGINT NOT NULL REFERENCES apis(api_id) ON DELETE CASCADE,
   plan_name VARCHAR(50) NOT NULL,
