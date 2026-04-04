@@ -67,6 +67,7 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     baseline-version: 40
+    validate-on-migrate: false
 
 springdoc:
   api-docs:
