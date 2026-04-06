@@ -202,6 +202,53 @@ public class ApiRequestService {
         return toMap(requestRepo.save(req));
     }
 
+    // ── Developer: resubmit after changes requested ───────────────────────────
+    @Transactional
+    public Map<String, Object> resubmitRequest(Long requestId, Map<String, Object> body) {
+        User developer = currentUser();
+        ApiRequest req = getRequest(requestId);
+
+        // verify this request belongs to this developer
+        if (!req.getSubmittedBy().getUserId().equals(developer.getUserId()))
+            throw new ApiManagerException("Not authorized to resubmit this request");
+
+        // only allow resubmit if status is changes_requested
+        if (!"changes_requested".equals(req.getStatus()))
+            throw new ApiManagerException("Only requests with changes_requested status can be resubmitted");
+
+        // update fields if provided
+        if (body.get("apiName") != null && !body.get("apiName").toString().isBlank())
+            req.setApiName(body.get("apiName").toString());
+
+        if (body.get("description") != null)
+            req.setDescription(body.get("description").toString());
+
+        if (body.get("baseUrl") != null && !body.get("baseUrl").toString().isBlank())
+            req.setBaseUrl(body.get("baseUrl").toString());
+
+        if (body.get("visibility") != null)
+            req.setVisibility(body.get("visibility").toString());
+
+        // update endpoints if provided
+        if (body.get("endpoints") != null) {
+            try {
+                req.setEndpoints(objectMapper.writeValueAsString(body.get("endpoints")));
+            } catch (Exception e) {
+                log.warn("Failed to serialize endpoints: {}", e.getMessage());
+            }
+        }
+
+        // reset status back to pending + clear previous feedback
+        req.setStatus("pending");
+        req.setFeedback(null);
+        req.setRejectionReason(null);
+        req.setReviewedBy(null);
+        req.setReviewedAt(null);
+        req.setSubmittedAt(LocalDateTime.now());
+
+        return toMap(requestRepo.save(req));
+    }
+
     // ── Provider: pending count for badge ─────────────────────────────────────
     public long getPendingCount() {
         User provider = currentUser();

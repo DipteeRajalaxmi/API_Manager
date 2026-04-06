@@ -302,11 +302,11 @@ export default function SettingsPage() {
           {/* Sidebar */}
           <div className="s-sidebar">
             <div style={{ background:"#fff", borderRadius:20, overflow:"hidden", border:"1px solid #f3f4f6", boxShadow:"0 1px 3px rgba(0,0,0,.05),0 4px 20px rgba(0,0,0,.04)", marginBottom:12 }}>
-              <div style={{ height:52, background:"linear-gradient(135deg,#0d9488 0%,#0891b2 100%)", position:"relative" }}>
+              <div style={{ height:60, background:"linear-gradient(135deg,#0d9488 0%,#0891b2 100%)", position:"relative" }}>
                 <div style={{ position:"absolute", inset:0, opacity:.15, backgroundImage:"radial-gradient(circle at 20% 80%,white 1px,transparent 1px),radial-gradient(circle at 80% 20%,white 1px,transparent 1px)", backgroundSize:"24px 24px" }}/>
               </div>
-              <div style={{ padding:"0 20px 20px" }}>
-                <div className="av-pulse" style={{ width:60, height:60, borderRadius:18, background:"linear-gradient(135deg,#14b8a6,#06b6d4)", display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontWeight:800, fontSize:24, border:"3px solid white", marginTop:-30, marginBottom:12, boxShadow:"0 4px 14px rgba(20,184,166,.3)", flexShrink:0 }}>
+              <div style={{ padding:"4px 20px 20px" }}>
+                <div className="av-pulse" style={{ width:60, height:60, borderRadius:18, background:"linear-gradient(135deg,#14b8a6,#06b6d4)", display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontWeight:800, fontSize:24, border:"3px solid white", marginTop:-32, marginBottom:12, boxShadow:"0 4px 14px rgba(20,184,166,.3)", flexShrink:0, position:"relative", zIndex:2 }}>
                   {profile?.name?.[0]?.toUpperCase() ?? "?"}
                 </div>
                 <p style={{ fontSize:15, fontWeight:800, color:"#111827", margin:"0 0 4px" }}>{profile?.name}</p>
@@ -435,7 +435,7 @@ export default function SettingsPage() {
                     <button className="sbtn sbtn-p" onClick={() => setModal("password")}>Change password</button>
                   </div>
 
-                  <div className="sec-row">
+                  {/* <div className="sec-row">
                     <div style={{ display:"flex", alignItems:"center", gap:14 }}>
                       <div style={{ width:38, height:38, borderRadius:11, background:"#fef2f2", border:"1px solid #fecaca", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                         <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={1.75}>
@@ -448,7 +448,7 @@ export default function SettingsPage() {
                       </div>
                     </div>
                     <button className="sbtn sbtn-d" onClick={() => setModal("delete")}>Delete account</button>
-                  </div>
+                  </div> */}
 
                 </div>
               </div>

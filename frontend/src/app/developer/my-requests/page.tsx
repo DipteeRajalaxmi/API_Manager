@@ -57,8 +57,8 @@ export default function MyRequestsPage() {
   const changes   = requests.filter(r => r.status === "changes_requested").length;
 
   return (
+  <DashboardLayout>
     <OrgGuard>
-    <DashboardLayout>
       <div className="p-8 animate-fade-in">
 
         {/* Header */}
@@ -158,10 +158,21 @@ export default function MyRequestsPage() {
                     </div>
                   )}
 
-                  {req.status === "changes_requested" && req.feedback && (
-                    <div className="mx-6 mb-4 bg-blue-50 border border-blue-100 rounded-xl p-4">
-                      <p className="text-xs font-bold text-blue-600 mb-1">🔄 Provider Feedback</p>
-                      <p className="text-xs text-blue-500">{req.feedback}</p>
+                  {req.status === "changes_requested" && (
+                    <div className="mx-6 mb-4 space-y-3">
+                      {req.feedback && (
+                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                          <p className="text-xs font-bold text-blue-600 mb-1">🔄 Provider Feedback</p>
+                          <p className="text-xs text-blue-500">{req.feedback}</p>
+                        </div>
+                      )}
+                      <div className="flex justify-end">
+                        <Link
+                          href={`/developer/contribute?resubmit=${req.requestId}`}
+                          className="text-xs font-bold px-4 py-2 grad-teal text-white rounded-xl hover:opacity-90 transition-all">
+                          ✏️ Edit & Resubmit
+                        </Link>
+                      </div>
                     </div>
                   )}
 
@@ -250,7 +261,8 @@ export default function MyRequestsPage() {
           </div>
         )}
       </div>
+      </OrgGuard>
     </DashboardLayout>
-    </OrgGuard>
+ 
   );
 }

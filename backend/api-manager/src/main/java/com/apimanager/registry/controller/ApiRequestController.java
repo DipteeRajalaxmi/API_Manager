@@ -65,4 +65,13 @@ public class ApiRequestController {
     public ResponseEntity<Map<String, Object>> pendingCount() {
         return ResponseEntity.ok(Map.of("count", requestService.getPendingCount()));
     }
+
+
+    // Developer: resubmit after changes requested
+    @PutMapping("/{requestId}/resubmit")
+    public ResponseEntity<Map<String, Object>> resubmit(
+            @PathVariable Long requestId,
+            @RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(requestService.resubmitRequest(requestId, body));
+    }
 }

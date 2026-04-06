@@ -245,6 +245,8 @@ export default function DeveloperSettingsPage() {
           background: var(--bg);
           min-height: 100vh;
           padding: 2rem 2.5rem 4rem;
+          max-width: 900px;
+          margin: 0 auto;
         }
 
         .sp-heading { margin-bottom: 1.75rem; }
@@ -278,7 +280,7 @@ export default function DeveloperSettingsPage() {
         }
 
         .sp-grid {
-          max-width: 760px;
+          width: 100%;
           display: grid;
           grid-template-columns: 1fr 1fr;
           gap: 1.25rem;
@@ -632,7 +634,7 @@ export default function DeveloperSettingsPage() {
                 </div>
 
                 {/* Delete Account row */}
-                <div className="sec-row-inner">
+                {/* <div className="sec-row-inner">
                   <div className="sec-row-top">
                     <div style={{ width: 34, height: 34, borderRadius: 9, background: "#fef2f2", border: "1px solid #fecaca", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#ef4444" strokeWidth={1.75}>
@@ -645,7 +647,7 @@ export default function DeveloperSettingsPage() {
                     </div>
                   </div>
                   <button className="sbtn sbtn-d" onClick={() => setModal("delete")}>Delete account</button>
-                </div>
+                </div> */}
               </div>
             </div>
 

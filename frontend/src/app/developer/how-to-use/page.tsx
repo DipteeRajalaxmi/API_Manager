@@ -3,7 +3,7 @@ import { useState } from "react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
 
-type Section = "quickstart" | "authenticate" | "requests" | "errors" | "ratelimits" | "tips";
+type Section = "quickstart" | "authenticate" | "requests" | "errors" | "ratelimits" | "planbased" | "tips";
 
 const GATEWAY_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -44,6 +44,7 @@ export default function HowToUsePage() {
     { key: "requests",     icon: "📡", label: "Making Requests"     },
     { key: "errors",       icon: "⚠️", label: "Error Responses"    },
     { key: "ratelimits",   icon: "⏱",  label: "Rate Limits"        },
+    { key: "planbased",    icon: "📋", label: "Plan-Based Limits" },
     { key: "tips",         icon: "💡", label: "Tips & Best Practices"},
   ];
 
@@ -436,8 +437,8 @@ export default function HowToUsePage() {
                       { msg: "Subscription is cancelled",      fix: "Re-subscribe to the API" },
                     ],
                     example: `{
-  "error": "Invalid API key"
-}`,
+                    "error": "Invalid API key"
+                  }`,
                     id: "err-401",
                   },
                   {
@@ -449,10 +450,10 @@ export default function HowToUsePage() {
                       { msg: "IP blocked",             fix: "Your IP has been blocked by the provider" },
                     ],
                     example: `{
-  "error": "Endpoint access denied",
-  "reason": "You do not have access to this endpoint",
-  "code": 403
-}`,
+                    "error": "Endpoint access denied",
+                    "reason": "You do not have access to this endpoint",
+                    "code": 403
+                  }`,
                     id: "err-403",
                   },
                   {
@@ -467,12 +468,12 @@ export default function HowToUsePage() {
                       { msg: "Rate limit exceeded: ENDPOINT_PER_MINUTE", fix: "This endpoint has a stricter limit — wait 60s" },
                     ],
                     example: `{
-  "error": "Rate limit exceeded",
-  "limitType": "PER_MINUTE",
-  "limit": 60,
-  "remaining": 0,
-  "retryAfterSeconds": 60
-}`,
+                      "error": "Rate limit exceeded",
+                      "limitType": "PER_MINUTE",
+                      "limit": 60,
+                      "remaining": 0,
+                      "retryAfterSeconds": 60
+                    }`,
                     id: "err-429",
                     extra: "Check Retry-After response header for exact wait time.",
                   },
@@ -486,10 +487,10 @@ export default function HowToUsePage() {
                       { msg: "Circuit breaker open", fix: "Provider backend is down — retry after 30 seconds" },
                     ],
                     example: `{
-  "error": "API is temporarily unavailable",
-  "reason": "Under maintenance until 6pm IST",
-  "code": 503
-}`,
+                    "error": "API is temporarily unavailable",
+                    "reason": "Under maintenance until 6pm IST",
+                    "code": 503
+                  }`,
                     id: "err-503",
                   },
                   {
@@ -500,8 +501,8 @@ export default function HowToUsePage() {
                       { msg: "Upstream service error", fix: "Provider backend returned an error or is down — retry later" },
                     ],
                     example: `{
-  "error": "Upstream service error: Connection refused"
-}`,
+                      "error": "Upstream service error: Connection refused"
+                    }`,
                     id: "err-502",
                   },
                   {
@@ -512,10 +513,10 @@ export default function HowToUsePage() {
                       { msg: "Request too large", fix: "Your request body exceeds 10MB limit" },
                     ],
                     example: `{
-  "error": "Request too large",
-  "maxSizeBytes": 10485760,
-  "receivedBytes": 15000000
-}`,
+                      "error": "Request too large",
+                      "maxSizeBytes": 10485760,
+                      "receivedBytes": 15000000
+                    }`,
                     id: "err-413",
                   },
                 ].map(e => (
@@ -573,20 +574,27 @@ export default function HowToUsePage() {
                   <h3 className="font-bold text-gray-800 text-sm mb-4">How Rate Limits Work</h3>
                   <div className="space-y-3">
                     {[
-                      { level: "Endpoint Level", desc: "Checked FIRST. Specific limits per route (e.g. POST /orders: 5/min)", color: "purple", icon: "⚡" },
-                      { level: "API Level",       desc: "Checked SECOND. Overall cap for all calls to this API",              color: "teal",   icon: "🌐" },
+  { level: "Endpoint Level", desc: "Checked FIRST. Specific limits per route (e.g. POST /orders: 5/min)", color: "purple", icon: "⚡" },
+  { level: "API Level",      desc: "Checked SECOND. Overall cap for all calls to this API",               color: "teal",   icon: "🌐" },
+  { level: "Plan Level",     desc: "Checked SECOND (if X-Client-Plan header sent). Per-client independent limits based on plan (Starter/Professional/Business/Enterprise)", color: "blue", icon: "📋" },
                     ].map(l => (
                       <div key={l.level} className={`rounded-xl p-4 border
-                        ${l.color === "purple" ? "bg-purple-50 border-purple-100" : "bg-teal-50 border-teal-100"}`}>
+                        ${l.color === "purple" ? "bg-purple-50 border-purple-100" :
+                          l.color === "blue"   ? "bg-blue-50 border-blue-100"     :
+                                                "bg-teal-50 border-teal-100"}`}>
                         <div className="flex items-center gap-2 mb-1">
                           <span>{l.icon}</span>
                           <p className={`text-xs font-bold
-                            ${l.color === "purple" ? "text-purple-700" : "text-teal-700"}`}>
+                            ${l.color === "purple" ? "text-purple-700" :
+                              l.color === "blue"   ? "text-blue-700"   :
+                                                    "text-teal-700"}`}>
                             {l.level}
                           </p>
                         </div>
                         <p className={`text-xs
-                          ${l.color === "purple" ? "text-purple-600" : "text-teal-600"}`}>
+                          ${l.color === "purple" ? "text-purple-600" :
+                            l.color === "blue"   ? "text-blue-600"   :
+                                                  "text-teal-600"}`}>
                           {l.desc}
                         </p>
                       </div>
@@ -627,27 +635,247 @@ export default function HowToUsePage() {
                 <div className="card p-5">
                   <h3 className="font-bold text-gray-800 text-sm mb-3">Handling 429 in Code</h3>
                   <CodeBlock id="handle-429" lang="javascript" code={`async function callApi(endpoint) {
-  const response = await fetch(
-    \`${GATEWAY_URL}/gateway/\${endpoint}\`,
-    { headers: { "X-API-Key": "am_your_key" } }
-  );
+                      const response = await fetch(
+                        \`${GATEWAY_URL}/gateway/\${endpoint}\`,
+                        { headers: { "X-API-Key": "am_your_key" } }
+                      );
 
-  if (response.status === 429) {
-    const retryAfter = response.headers.get("Retry-After") || "60";
-    const waitMs = parseInt(retryAfter) * 1000;
-    
-    console.log(\`Rate limited. Retrying after \${retryAfter}s...\`);
-    await new Promise(resolve => setTimeout(resolve, waitMs));
-    
-    return callApi(endpoint); // retry once
-  }
+                      if (response.status === 429) {
+                        const retryAfter = response.headers.get("Retry-After") || "60";
+                        const waitMs = parseInt(retryAfter) * 1000;
+                        
+                        console.log(\`Rate limited. Retrying after \${retryAfter}s...\`);
+                        await new Promise(resolve => setTimeout(resolve, waitMs));
+                        
+                        return callApi(endpoint); // retry once
+                      }
 
-  return response.json();
-}`} />
+                      return response.json();
+                    }`} />
                 </div>
               </div>
             )}
+              {/* ── PLAN-BASED LIMITS ── */}
+              {activeSection === "planbased" && (
+                <div className="animate-fade-in space-y-5">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-gray-800 mb-1">Plan-Based Rate Limits</h2>
+                    <p className="text-gray-400 text-sm">
+                      Per-client independent rate limiting based on subscription plans.
+                    </p>
+                  </div>
 
+                  {/* What is it */}
+                  <div className="card p-5">
+                    <h3 className="font-bold text-gray-800 text-sm mb-3">What is Plan-Based Rate Limiting?</h3>
+                    <p className="text-xs text-gray-500 leading-relaxed mb-4">
+                      Instead of a shared pool for all clients, plan-based limits give each client their own
+                      independent counter. Two clients on the same plan never affect each other's limits.
+                    </p>
+                    <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                      <div>
+                        <p className="text-xs font-bold text-red-500 mb-1">❌ Without Plan-Based (shared pool)</p>
+                        <code className="text-xs text-gray-600 block">
+                          all request with same x-api-key and no client id will share the pool, total req = 100/min → ALL blocked
+                        </code>
+                      </div>
+                      <div className="border-t border-gray-200 pt-3">
+                        <p className="text-xs font-bold text-green-600 mb-2">✅ With X-Client-Id (independent — works with OR without plan)</p>
+                        <code className="text-xs text-gray-600 block leading-relaxed">
+                          Client1 → 40/100 req/min ✅{"\n"}
+                          Client2 → 35/100 req/min ✅{"\n"}
+                          Client3 → 25/100 req/min ✅{"\n"}
+                          Each client has their own counter — nobody blocks anyone else.
+                          ( Clients are the one using your application )
+                        </code>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* The 3 headers */}
+                  <div className="card p-5">
+                    <h3 className="font-bold text-gray-800 text-sm mb-3">Required Headers</h3>
+                    <p className="text-xs text-gray-400 mb-4">
+                      Send these headers along with your API key to enable plan-based tracking:
+                    </p>
+                    <div className="space-y-3">
+                      {[
+                        {
+                          header: "X-API-Key",
+                          value: "am_your_subscription_key",
+                          required: true,
+                          desc: "Your subscription key — identifies the developer/app",
+                          color: "teal",
+                        },
+                        {
+                          header: "X-Client-Id",
+                          value: "company1-unique-id",
+                          required: true,
+                          desc: "Unique identifier for the client making the request — each client tracked independently",
+                          color: "blue",
+                        },
+                        {
+                          header: "X-Client-Plan",
+                          value: "professional",
+                          required: false,
+                          desc: "The client's plan name — gateway applies that plan's limits. Options: starter, professional, business, enterprise",
+                          color: "purple",
+                        },
+                      ].map(h => (
+                        <div key={h.header} className={`rounded-xl p-4 border
+                          ${h.color === "teal"   ? "bg-teal-50 border-teal-100"   :
+                            h.color === "blue"   ? "bg-blue-50 border-blue-100"   :
+                                                  "bg-purple-50 border-purple-100"}`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <code className={`text-xs font-mono font-bold
+                              ${h.color === "teal"   ? "text-teal-700"   :
+                                h.color === "blue"   ? "text-blue-700"   :
+                                                      "text-purple-700"}`}>
+                              {h.header}
+                            </code>
+                            <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full
+                              ${h.required
+                                ? "bg-red-50 text-red-500 border border-red-100"
+                                : "bg-gray-100 text-gray-400"}`}>
+                              {h.required ? "Required" : "Optional"}
+                            </span>
+                          </div>
+                          <code className="text-xs text-gray-500 block mb-1">{h.value}</code>
+                          <p className={`text-xs
+                            ${h.color === "teal"   ? "text-teal-600"   :
+                              h.color === "blue"   ? "text-blue-600"   :
+                                                    "text-purple-600"}`}>
+                            {h.desc}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Plans */}
+                  <div className="card p-5">
+                    <h3 className="font-bold text-gray-800 text-sm mb-3">Available Plans</h3>
+                    <p className="text-xs text-gray-400 mb-4">
+                      Each API provider defines their own limits per plan. Contact your API provider for exact limits.
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { plan: "starter",      color: "gray",   desc: "Entry level — lower limits" },
+                        { plan: "professional", color: "teal",   desc: "Mid tier — balanced limits" },
+                        { plan: "business",     color: "blue",   desc: "High usage — generous limits" },
+                        { plan: "enterprise",   color: "purple", desc: "Unlimited — custom limits" },
+                      ].map(p => (
+                        <div key={p.plan} className={`rounded-xl p-3 border
+                          ${p.color === "teal"   ? "bg-teal-50 border-teal-100"     :
+                            p.color === "blue"   ? "bg-blue-50 border-blue-100"     :
+                            p.color === "purple" ? "bg-purple-50 border-purple-100" :
+                                                  "bg-gray-50 border-gray-200"}`}>
+                          <span className={`text-xs font-bold capitalize
+                            ${p.color === "teal"   ? "text-teal-700"   :
+                              p.color === "blue"   ? "text-blue-700"   :
+                              p.color === "purple" ? "text-purple-700" :
+                                                    "text-gray-600"}`}>
+                            {p.plan}
+                          </span>
+                          <p className="text-xs text-gray-400 mt-1">{p.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Code examples */}
+                  <div className="card p-5">
+                    <h3 className="font-bold text-gray-800 text-sm mb-4">Code Examples</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-xs text-gray-400 mb-2">Basic request with plan-based headers:</p>
+                        <CodeBlock id="plan-curl" code={`curl -X GET "${GATEWAY_URL}/gateway/api/sync/status" \\
+                -H "X-API-Key: am_your_key" \\
+                -H "X-Client-Id: company1-uuid" \\
+                -H "X-Client-Plan: professional" \\
+                -H "Authorization: Bearer your-backend-jwt"`} />
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400 mb-2">JavaScript/fetch example:</p>
+                        <CodeBlock id="plan-js" lang="javascript" code={`const response = await fetch(
+                "${GATEWAY_URL}/gateway/api/sync/status",
+                {
+                  headers: {
+                    "X-API-Key":      "am_your_key",
+                    "X-Client-Id":    client.id,          // your client's unique ID
+                    "X-Client-Plan":  client.plan,         // "starter" | "professional" | "business" | "enterprise"
+                    "Authorization":  \`Bearer \${jwt}\`,   // backend auth if required
+                  }
+                }
+              );`} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Fallback behavior */}
+                  <div className="card p-5">
+                    <h3 className="font-bold text-gray-800 text-sm mb-3">Fallback Behavior</h3>
+                    <div className="space-y-2">
+                      {[
+  { 
+    scenario: "X-Client-Id + X-Client-Plan sent", 
+    result: "Plan limits applied — each client tracked independently", 
+    example: "Client1 → 45/70 per min, Client2 → 30/70 per min",
+    color: "green" 
+  },
+  { 
+    scenario: "X-Client-Id sent, no X-Client-Plan", 
+    result: "Global API limits applied — but still per client independently", 
+    example: "Client1 → 5/100 per min, Client2 → 3/100 per min (separate counters)",
+    color: "green" 
+  },
+  { 
+    scenario: "No X-Client-Id, no X-Client-Plan", 
+    result: "Global API limits as shared pool — all requests counted together", 
+    example: "Client1 + Client2 + Client3 = shared 100/min pool",
+    color: "orange" 
+  },
+  { 
+    scenario: "Plan not configured by provider", 
+    result: "Falls back to global API limits per client (if X-Client-Id sent)", 
+    example: "Provider skipped plan setup → global limits still work per client",
+    color: "blue" 
+  },
+                      ].map((row, i) => (
+                        <div key={i} className="bg-gray-50 rounded-xl p-3">
+                          <code className="text-xs text-gray-700 block mb-1">{row.scenario}</code>
+                          <p className={`text-xs font-semibold mb-1
+                            ${row.color === "green"  ? "text-green-600"  :
+                              row.color === "orange" ? "text-orange-500" :
+                                                      "text-blue-600"}`}>
+                            → {row.result}
+                          </p>
+                          <p className="text-xs text-gray-400 font-mono">{row.example}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 429 response for plan limit */}
+                  <div className="card p-5">
+                    <h3 className="font-bold text-gray-800 text-sm mb-3">429 Response for Plan Limit</h3>
+                    <CodeBlock id="plan-429" lang="json" code={`{
+                "error": "Rate limit exceeded",
+                "limitType": "PLAN_PER_MINUTE",
+                "limit": 70,
+                "remaining": 0,
+                "retryAfterSeconds": 60
+              }`} />
+                    <p className="text-xs text-gray-400 mt-3">
+                      <code className="bg-gray-100 px-1 rounded">limitType</code> will be one of:{" "}
+                      <code className="bg-gray-100 px-1 rounded">PLAN_PER_MINUTE</code>,{" "}
+                      <code className="bg-gray-100 px-1 rounded">PLAN_PER_HOUR</code>,{" "}
+                      <code className="bg-gray-100 px-1 rounded">PLAN_PER_DAY</code>,{" "}
+                      <code className="bg-gray-100 px-1 rounded">PLAN_TOTAL</code>
+                    </p>
+                  </div>
+                </div>
+              )}
             {/* ── TIPS ── */}
             {activeSection === "tips" && (
               <div className="animate-fade-in space-y-5">
