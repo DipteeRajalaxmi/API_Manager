@@ -2,8 +2,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+// import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { login, saveAuth, getHomeRoute } from "@/lib/auth";
+import Lottie from "lottie-react";
 
 function RememberMe() {
   const [checked, setChecked] = useState(false);
@@ -69,6 +70,14 @@ export default function LoginPage() {
     transition: "all 0.2s",
     boxShadow: focused === name ? "0 0 0 3px rgba(45,212,191,0.1)" : "none",
   });
+
+  const [animationData, setAnimationData] = useState(null);
+
+  useEffect(() => {
+    fetch("/sign-in.json")
+      .then((res) => res.json())
+      .then(setAnimationData);
+  }, []);
 
   return (
     <>
@@ -251,13 +260,14 @@ export default function LoginPage() {
 
             {/* Lottie animation */}
             <div style={{
-              width: "100%", maxWidth: 360, margin: "0 auto 36px",
+              width: "100%",
+              maxWidth: 360,
+              margin: "0 auto 36px",
               animation: "floatY 5s ease-in-out infinite",
             }}>
-              <DotLottieReact
-                src="https://lottie.host/95ad63a6-08b9-4832-ba1c-f537323a1eef/ly6kjx2Fry.lottie"
-                loop autoplay
-              />
+              {animationData && (
+                <Lottie animationData={animationData} loop />
+              )}
             </div>
 
             {/* Stats */}

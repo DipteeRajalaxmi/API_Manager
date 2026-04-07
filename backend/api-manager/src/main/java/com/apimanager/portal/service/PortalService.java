@@ -484,11 +484,31 @@ public class PortalService {
         res.setUsedTotal(usageLogRepo.countTotalCalls(subId));
     }
 
+    // private Api getApiOwnedBy(Long apiId, Long providerId) {
+    //     Api api = apiRepo.findById(apiId)
+    //         .orElseThrow(() -> new ApiManagerException("API not found"));
+    //     if (!api.getCreatedBy().getUserId().equals(providerId))
+    //         throw new ApiManagerException("Not your API");
+    //     return api;
+    // }
+
     private Api getApiOwnedBy(Long apiId, Long providerId) {
         Api api = apiRepo.findById(apiId)
             .orElseThrow(() -> new ApiManagerException("API not found"));
-        if (!api.getCreatedBy().getUserId().equals(providerId))
-            throw new ApiManagerException("Not your API");
+
+        User provider = getUser(providerId);
+
+        boolean isCreator = api.getCreatedBy().getUserId().equals(providerId);
+
+        boolean isOrgProvider = provider.getOrganization() != null
+            && api.getOrganization() != null
+            && provider.getOrganization().getOrgId()
+                .equals(api.getOrganization().getOrgId())
+            && "API_PROVIDER".equals(provider.getRole().getRoleName());
+
+        if (!isCreator && !isOrgProvider)
+            throw new ApiManagerException("Not authorized to manage this API");
+
         return api;
     }
 

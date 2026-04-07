@@ -108,7 +108,7 @@ public class AuthService {
     public AuthResponse login(AuthRequest request) {
 
         // Find user by email
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmailWithDetails(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + request.getEmail()));
 
         // Check password matches hash

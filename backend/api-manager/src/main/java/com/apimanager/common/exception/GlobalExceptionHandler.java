@@ -74,16 +74,37 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(com.apimanager.common.exception.ApiManagerException.class)
     public ResponseEntity<Map<String, Object>> handleApiManagerException(
             com.apimanager.common.exception.ApiManagerException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                .body(buildError(HttpStatus.BAD_GATEWAY, ex.getMessage(), null));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), null));
     }
 
-    // Handle business logic errors (RuntimeException)
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException ex) {
+        // Handle business logic errors (RuntimeException)
+        @ExceptionHandler(RuntimeException.class)
+        public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException ex) {
+        String msg = ex.getMessage() != null ? ex.getMessage().toLowerCase() : "";
+
+        if (msg.contains("not found")) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(buildError(HttpStatus.NOT_FOUND, ex.getMessage(), null));
+        }
+        if (msg.contains("not authorized") || msg.contains("unauthorized") || msg.contains("not your")) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(buildError(HttpStatus.FORBIDDEN, ex.getMessage(), null));
+        }
+        if (msg.contains("already exists") || msg.contains("already subscribed") || msg.contains("duplicate")) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(buildError(HttpStatus.CONFLICT, ex.getMessage(), null));
+        }
+        if (msg.contains("only") || msg.contains("cannot") || msg.contains("must")) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(buildError(HttpStatus.BAD_REQUEST, ex.getMessage(), null));
+        }
+
+        // log unexpected ones
+        System.err.println("[GlobalExceptionHandler] Unhandled RuntimeException: " + ex.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(buildError(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), null));
-    }
+                .body(buildError(HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred", null));
+        }
 
     // Handle anything else unexpected
     @ExceptionHandler(Exception.class)

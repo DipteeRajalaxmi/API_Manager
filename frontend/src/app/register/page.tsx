@@ -2,7 +2,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+// import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import Lottie from "lottie-react";
 import { register, saveAuth, getHomeRoute } from "@/lib/auth";
 
 const STEPS = ["Account", "Role", "Details"];
@@ -106,6 +107,14 @@ export default function RegisterPage() {
     ...inputStyle(name),
     padding: "12px 16px 12px 44px",
   });
+
+  const [animationData, setAnimationData] = useState(null);
+
+  useEffect(() => {
+    fetch("/register.json")
+      .then((res) => res.json())
+      .then(setAnimationData);
+  }, []);
 
   return (
     <>
@@ -287,13 +296,14 @@ export default function RegisterPage() {
 
             {/* Lottie */}
             <div style={{
-              width: "100%", maxWidth: 340, margin: "0 auto 28px",
+              width: "100%",
+              maxWidth: 340,
+              margin: "0 auto 28px",
               animation: "floatY 5s ease-in-out infinite",
             }}>
-              <DotLottieReact
-                src="https://lottie.host/e38b4816-2a0b-445d-b3b4-326712debb71/U26s5l6Izq.lottie"
-                loop autoplay
-              />
+              {animationData && (
+                <Lottie animationData={animationData} loop />
+              )}
             </div>
 
             {/* Role preview */}

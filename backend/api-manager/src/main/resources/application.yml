@@ -55,6 +55,12 @@ spring:
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 3
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jpa:
     hibernate:
       ddl-auto: ${JPA_DDL_AUTO:validate}
@@ -68,6 +74,20 @@ spring:
     baseline-on-migrate: true
     baseline-version: 40
     # validate-on-migrate: false
+
+  task:
+    execution:
+      pool:
+        core-size: 5
+        max-size: 20
+        queue-capacity: 500
+      thread-name-prefix: async-
+ 
+  cache:
+    type: caffeine
+    cache-names: apiKeys,planLimits
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=60s
 
 springdoc:
   api-docs:

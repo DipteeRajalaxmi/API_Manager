@@ -35,6 +35,8 @@ public class GatewayService {
     private final RestTemplate        restTemplate;
     private final SubscriptionEndpointPermissionRepository permissionRepo;
     private final ApiPlanLimitRepository apiPlanLimitRepo;
+    private final AsyncLogService asyncLogService;
+    private final CachedGatewayDataService cachedGatewayData;
 
     private final java.util.concurrent.ConcurrentHashMap<Long, CircuitBreakerState> circuitBreakers
     = new java.util.concurrent.ConcurrentHashMap<>();
@@ -50,8 +52,8 @@ public class GatewayService {
         long startMs = System.currentTimeMillis();
  
         // ── 1. Validate API key ──────────────────────────────────────────────
-        ApiKey apiKey = apiKeyRepo.findByClientId(rawKey)
-                .orElseThrow(() -> new GatewayAuthException("Invalid API key"));
+        ApiKey apiKey = cachedGatewayData.findApiKey(rawKey)
+            .orElseThrow(() -> new GatewayAuthException("Invalid API key"));
  
         if (!"active".equals(apiKey.getStatus()))
             throw new GatewayAuthException("API key is revoked or expired");
@@ -189,9 +191,8 @@ public class GatewayService {
             (long) upstream.getStatusCode().value(), latency, false, null,clientId, clientPlan, trackingKey);
         
  
-        // ── 6. Update key last_used_at ────────────────────────────────────────
-        apiKey.setLastUsedAt(LocalDateTime.now());
-        apiKeyRepo.save(apiKey);
+        // ── 6. Update key last_used_at (async — non-blocking) ─────────────────
+        asyncLogService.updateKeyLastUsed(apiKey.getKeyId());
  
         // ── 7. Build rate limit headers for response ──────────────────────────
         RateLimitHeaders headers = buildRateLimitHeaders(
@@ -238,8 +239,8 @@ public class GatewayService {
 
     // Plan limits take priority if plan header provided
     if (clientPlan != null && !clientPlan.isBlank()) {
-        ApiPlanLimit planLimit = apiPlanLimitRepo
-                .findByApi_ApiIdAndPlanName(api.getApiId(), clientPlan)
+        ApiPlanLimit planLimit = cachedGatewayData
+                .findPlanLimit(api.getApiId(), clientPlan)
                 .orElse(null);
 
         if (planLimit != null) {
@@ -384,35 +385,22 @@ private RateLimitResult checkRateLimitsPerClient(String trackingKey, Api api) {
         return headers;
     }
  
-        private void logCall(ApiKey apiKey, Subscription sub, ApiEndpoint endpoint,
-             String path, String method, HttpServletRequest request,
-                 Long status, Long latency,
-                 boolean rateLimited, String rateLimitType,
-                 String clientId, String clientPlan, String trackingKey) {
-        try {
-            ApiUsageLog usageLog = new ApiUsageLog();
-                usageLog.setApi(sub.getApi());
-                usageLog.setApplication(sub.getApplication());
-                usageLog.setSubscription(sub);
-                usageLog.setDeveloper(sub.getApplication().getDeveloper());
-                usageLog.setHttpMethod(method);
-                usageLog.setEndpointPath("/" + path);
-                usageLog.setResponseStatus(status);
-                usageLog.setIpAddress(getClientIp(request));
-                usageLog.setLatencyMs(latency);
-                usageLog.setUserAgent(request.getHeader("User-Agent"));
-                usageLog.setWasRateLimited(rateLimited);
-                usageLog.setRateLimitType(rateLimitType);
-                usageLog.setClientId(clientId);
-                usageLog.setClientPlan(clientPlan);
-                usageLog.setTrackingKey(trackingKey);
-                usageLog.setRequestTime(LocalDateTime.now());
-                usageLog.setEndpoint(endpoint);
-                usageLogRepo.save(usageLog);
-        } catch (Exception e) {
-        e.printStackTrace();
-        log.error("Failed to log gateway call: {}", e.getMessage(), e);
-    }
+       private void logCall(ApiKey apiKey, Subscription sub, ApiEndpoint endpoint,
+            String path, String method, HttpServletRequest request,
+                Long status, Long latency,
+                boolean rateLimited, String rateLimitType,
+                String clientId, String clientPlan, String trackingKey) {
+        // Extract request data synchronously (can't access request in async thread)
+        String ipAddress = getClientIp(request);
+        String userAgent = request.getHeader("User-Agent");
+
+        // Fire and forget — does NOT block the gateway response
+        asyncLogService.logCall(
+            apiKey, sub, endpoint, path, method,
+            ipAddress, userAgent,
+            status, latency, rateLimited, rateLimitType,
+            clientId, clientPlan, trackingKey
+        );
     }
  
     private String getClientIp(HttpServletRequest request) {
