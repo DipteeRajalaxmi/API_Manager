@@ -1,6 +1,5 @@
 "use client";
-export const dynamic = "force-dynamic";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense  } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -25,7 +24,7 @@ const METHOD_COLORS: Record<string, string> = {
   DELETE: "bg-red-50    text-red-500    border-red-100",
 };
 
-export default function ContributePage() {
+function ContributePageInner() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const resubmitId   = searchParams.get("resubmit"); // present when editing
@@ -385,5 +384,13 @@ export default function ContributePage() {
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </DashboardLayout>
     </OrgGuard>
+  );
+}
+
+export default function ContributePage() {
+  return (
+    <Suspense fallback={null}>
+      <ContributePageInner />
+    </Suspense>
   );
 }
